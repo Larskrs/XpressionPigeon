@@ -40,7 +40,7 @@ function fromCamel(str: string): string {
           :key="field"
           :label="String(field)"
           :model-value="value"
-          @commit="(val) => emit('update', sceneId, String(field), val)"
+          @commit="(val: any) => emit('update', sceneId, String(field), val)"
       />
     </div>
 

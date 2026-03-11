@@ -5,7 +5,6 @@ import { createSocket } from "./dashboard.socket.ts"
 import { useDashboardSocket } from "./useDashboardSocket.ts"
 import { store } from "./shared/store.ts"
 import { groups } from "./groups.ts"
-import SceneInput from "@/SceneInput.vue"
 import SceneCard from "@/SceneCard.vue";
 
 const socket = createSocket()
