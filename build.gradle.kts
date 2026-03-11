@@ -78,24 +78,3 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
 }
-
-tasks.register<Exec>("buildExe") {
-    dependsOn(tasks.shadowJar)
-
-    val jar = tasks.shadowJar.get().archiveFile.get().asFile
-    val outputDir = layout.buildDirectory.dir("exe").get().asFile
-
-    doFirst {
-        outputDir.mkdirs()
-    }
-
-    commandLine(
-        "jpackage",
-        "--input", jar.parent,
-        "--name", "MyServer",
-        "--main-jar", jar.name,
-        "--type", "exe",
-        "--dest", outputDir,
-        "--java-options", "-Xmx512m"
-    )
-}

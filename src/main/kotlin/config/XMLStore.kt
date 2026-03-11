@@ -9,10 +9,15 @@ import javax.xml.transform.OutputKeys
 import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
+import kotlinx.coroutines.*
 
 object XmlDataStore {
     private val data = mutableMapOf<String, String>()
     private lateinit var xmlFile: File
+
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var writeJob: Job? = null
+    private const val DEBOUNCE_MS = 200L
 
     fun init(config: AppConfig) {
         xmlFile = File(AppPaths.workDir, "xpression_data.xml")
@@ -22,9 +27,8 @@ object XmlDataStore {
                 data["${scene.id}_$key"] = ""
             }
         }
-        // If file already exists, load it first so we don't lose existing values
         if (xmlFile.exists()) loadFromFile()
-        writeXml()
+        writeXmlNow() // always do an immediate write on init
         debugPrint()
     }
 
@@ -35,7 +39,7 @@ object XmlDataStore {
             return
         }
         data[fieldKey] = value
-        writeXml()
+        scheduleWrite()
     }
 
     fun get(sceneId: String, key: String): String? {
@@ -63,6 +67,15 @@ object XmlDataStore {
         println("====================")
     }
 
+    // Cancel any pending write and schedule a new one after DEBOUNCE_MS
+    private fun scheduleWrite() {
+        writeJob?.cancel()
+        writeJob = scope.launch {
+            delay(DEBOUNCE_MS)
+            writeXmlNow()
+        }
+    }
+
     private fun loadFromFile() {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xmlFile)
         val root = doc.documentElement
@@ -72,18 +85,21 @@ object XmlDataStore {
             if (node.nodeType == org.w3c.dom.Node.ELEMENT_NODE) {
                 val key = node.nodeName
                 val value = node.textContent
-                if (data.containsKey(key)) data[key] = value  // only load known keys
+                if (data.containsKey(key)) data[key] = value
             }
         }
         println("XmlDataStore: Loaded existing data from ${xmlFile.path}")
     }
 
-    private fun writeXml() {
+    private fun writeXmlNow() {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
         val root = doc.createElement("XpressionData")
         doc.appendChild(root)
 
-        data.forEach { (key, value) ->
+        // Snapshot the map to avoid holding any lock during IO
+        val snapshot = synchronized(data) { data.toMap() }
+
+        snapshot.forEach { (key, value) ->
             val element = doc.createElement(key)
             element.textContent = value
             root.appendChild(element)

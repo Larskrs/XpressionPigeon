@@ -10,6 +10,8 @@ data class AppConfig(
     val scenes: List<XprScene> = listOf(
         XprScene("LeftPersonSuper", 8, 2, listOf("title", "subtitle")),
         XprScene("RightPersonSuper", 7, 3, listOf("title", "subtitle")),
-        XprScene("ThemeSuper", 3, 3, listOf("title", "subtitle")),
+        XprScene("ThemeSuper", 3, 1, listOf("title", "subtitle")),
+        XprScene("Location", 6, -2, listOf("title", "subtitle")),
+        XprScene("Pillar", 10, 10, listOf("url", "title", "subtitle", "image")),
     ),
 )

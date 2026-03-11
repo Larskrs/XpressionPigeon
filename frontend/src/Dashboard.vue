@@ -6,6 +6,7 @@ import { useDashboardSocket } from "./useDashboardSocket.ts"
 import { store } from "./shared/store.ts"
 import { groups } from "./groups.ts"
 import SceneCard from "@/SceneCard.vue";
+import RundownTable from "@/RundownTable.vue";
 
 const socket = createSocket()
 useDashboardSocket(socket)
@@ -67,25 +68,44 @@ const updateField = (sceneId: string, key: string, value: string) => {
       <span class="text-sm tracking-widest uppercase">Waiting for data...</span>
     </div>
 
-    <div class="flex flex-col gap-10">
-
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-10">
       <!-- Groups -->
-      <div v-for="group in groups" :key="group.label">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-3">
-            <span class="w-1 h-5 rounded-sm bg-amber-400"></span>
-            <h2 class="text-xs tracking-[0.25em] uppercase text-zinc-400 font-semibold">{{ group.label }}</h2>
+        <div v-for="group in groups" :key="group.label">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="w-1 h-5 rounded-sm bg-amber-400"></span>
+              <h2 class="text-xs tracking-[0.25em] uppercase text-zinc-400 font-semibold">{{ group.label }}</h2>
+            </div>
+            <div class="flex rounded-lg overflow-hidden border border-zinc-700 text-xs font-semibold tracking-widest uppercase">
+              <button @click="takeGroup(group.sceneIds)" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white transition-colors">▶ Take All</button>
+              <div class="w-px bg-zinc-700"></div>
+              <button @click="outGroup(group.sceneIds)"  class="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">◀ Out All</button>
+            </div>
           </div>
-          <div class="flex rounded-lg overflow-hidden border border-zinc-700 text-xs font-semibold tracking-widest uppercase">
-            <button @click="takeGroup(group.sceneIds)" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white transition-colors">▶ Take All</button>
-            <div class="w-px bg-zinc-700"></div>
-            <button @click="outGroup(group.sceneIds)"  class="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">◀ Out All</button>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
+            <template v-for="sceneId in group.sceneIds.filter(id => scenes[id])" :key="sceneId">
+              <SceneCard
+                  :scene-id="sceneId"
+                  :fields="scenes[sceneId]"
+                  :is-on="sceneStates[sceneId]"
+                  @take="takeScene"
+                  @out="outScene"
+                  @update="updateField"
+              />
+            </template>
           </div>
         </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <template v-for="sceneId in group.sceneIds.filter(id => scenes[id])" :key="sceneId">
+        <!-- Ungrouped -->
+        <div v-if="ungroupedSceneIds.length > 0">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="w-1 h-5 rounded-sm bg-zinc-600"></span>
+            <h2 class="text-xs tracking-[0.25em] uppercase text-zinc-500 font-semibold">Other</h2>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
             <SceneCard
+                v-for="sceneId in ungroupedSceneIds"
+                :key="sceneId"
                 :scene-id="sceneId"
                 :fields="scenes[sceneId]"
                 :is-on="sceneStates[sceneId]"
@@ -93,30 +113,10 @@ const updateField = (sceneId: string, key: string, value: string) => {
                 @out="outScene"
                 @update="updateField"
             />
-          </template>
+          </div>
         </div>
       </div>
-
-      <!-- Ungrouped -->
-      <div v-if="ungroupedSceneIds.length > 0">
-        <div class="flex items-center gap-3 mb-4">
-          <span class="w-1 h-5 rounded-sm bg-zinc-600"></span>
-          <h2 class="text-xs tracking-[0.25em] uppercase text-zinc-500 font-semibold">Other</h2>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <SceneCard
-              v-for="sceneId in ungroupedSceneIds"
-              :key="sceneId"
-              :scene-id="sceneId"
-              :fields="scenes[sceneId]"
-              :is-on="sceneStates[sceneId]"
-              @take="takeScene"
-              @out="outScene"
-              @update="updateField"
-          />
-        </div>
-      </div>
-
+      <RundownTable @update="updateField" @take="takeScene" @out="outScene" />
     </div>
   </div>
 </template>
