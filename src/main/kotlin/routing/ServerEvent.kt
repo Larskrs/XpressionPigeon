@@ -25,4 +25,31 @@ sealed class ServerEvent {
     @Serializable
     @SerialName("SceneOut")
     data class SceneOut(val sceneId: String) : ServerEvent()
+
+
+
+
+
+
+    @Serializable
+    @SerialName("RundownList")
+    data class RundownList(
+        val rundowns: List<Map<String, String>>,  // [{id, name}, ...]
+    ) : ServerEvent()
+
+    @Serializable
+    @SerialName("RundownData")
+    data class RundownData(
+        val id: String,
+        val name: String,
+        val rows: List<Map<String, String>>,
+    ) : ServerEvent()
+
+    @Serializable
+    @SerialName("RundownSaved")
+    data class RundownSaved(val id: String, val name: String) : ServerEvent()
+
+    @Serializable
+    @SerialName("RundownDeleted")
+    data class RundownDeleted(val id: String) : ServerEvent()
 }

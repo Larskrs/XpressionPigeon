@@ -3,6 +3,7 @@ package routing
 
 import com.example.routing.RossTalkClient
 import com.example.routing.XmlDataStore
+import data.RundownStore
 import io.ktor.server.websocket.DefaultWebSocketServerSession
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
@@ -54,6 +55,35 @@ suspend fun handleSocket(session: DefaultWebSocketServerSession) {
                     RossTalkClient.takeScene(event.sceneId)
                     broadcast(ServerEvent.ContentUpdated(event.sceneId, event.key, event.value))
                     broadcast(ServerEvent.SceneTaken(event.sceneId))
+                }
+
+
+
+                is WebSocketEvent.ListRundowns -> {
+                    val list = ServerEvent.RundownList(RundownStore.list())
+                    session.send(json.encodeToString(ServerEvent.serializer(), list))
+                }
+
+                is WebSocketEvent.LoadRundown -> {
+                    val rundown = RundownStore.get(event.id)
+                    if (rundown != null) {
+                        val response = ServerEvent.RundownData(rundown.name, rundown.name, rundown.rows)
+                        session.send(json.encodeToString(ServerEvent.serializer(), response))
+                    }
+                }
+
+                is WebSocketEvent.SaveRundown -> {
+                    val saved = RundownStore.save(event.id.ifBlank { event.name }, event.name, event.rows)
+                    broadcast(ServerEvent.RundownSaved(saved.name, saved.name))
+                }
+
+                is WebSocketEvent.DeleteRundown -> {
+                    RundownStore.delete(event.id)
+                    broadcast(ServerEvent.RundownDeleted(event.id))
+                }
+
+                is WebSocketEvent.FlushRundowns -> {
+                    //TODO:
                 }
             }
         }

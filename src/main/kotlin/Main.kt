@@ -3,6 +3,8 @@ package com.example
 import com.example.config.ConfigManager
 import com.example.routing.RossTalkClient
 import com.example.routing.XmlDataStore
+import data.RundownStore
+import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import java.io.BufferedReader
@@ -22,6 +24,7 @@ fun main() {
     }
 
     XmlDataStore.init(config)
+    RundownStore.init()
 
     startServer(80)
 }
