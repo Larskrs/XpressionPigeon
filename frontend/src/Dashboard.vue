@@ -83,7 +83,7 @@ const updateField = (sceneId: string, key: string, value: string) => {
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <template v-for="sceneId in group.sceneIds.filter(id => scenes[id])" :key="sceneId">
             <SceneCard
                 :scene-id="sceneId"
@@ -103,7 +103,7 @@ const updateField = (sceneId: string, key: string, value: string) => {
           <span class="w-1 h-5 rounded-sm bg-zinc-600"></span>
           <h2 class="text-xs tracking-[0.25em] uppercase text-zinc-500 font-semibold">Other</h2>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <SceneCard
               v-for="sceneId in ungroupedSceneIds"
               :key="sceneId"
