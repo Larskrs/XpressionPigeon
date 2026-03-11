@@ -1,47 +1,37 @@
 plugins {
     java
-    kotlin("jvm") version "2.3.0"
-    kotlin("plugin.serialization") version "2.3.0"
+    kotlin("jvm") version "2.1.20"
+    kotlin("plugin.serialization") version "2.1.20"
+    id("io.ktor.plugin") version "3.1.2"
     id("com.gradleup.shadow") version "9.0.0"
-    id("io.ktor.plugin") version "3.1.3"
 }
 
-group = "org.example"
-version = "1.0-SNAPSHOT"
+sourceSets.main {
+    resources {
+        srcDir(file("."))
+        include("frontend/dist/**")
+    }
+}
+
+group = "com.example"
+version = "0.0.2"
+
+val ktor_version = "3.1.2"
 
 application {
-    mainClass.set("org.example.MainKt")
+    mainClass.set("com.example.MainKt")
+}
 
-    val isDevelopment: Boolean = project.ext.has("development")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
+tasks.withType<Jar> {
+    manifest {
+        attributes("Implementation-Version" to project.version)
+    }
 }
 
 tasks.named<JavaExec>("run") {
     environment("DEV_MODE", "true")
     systemProperty("io.ktor.development", "true")
-}
-
-dependencies {
-    // Ktor server
-    implementation("io.ktor:ktor-server-core")
-    implementation("io.ktor:ktor-server-netty")
-    implementation("io.ktor:ktor-server-content-negotiation")
-    implementation("io.ktor:ktor-serialization-kotlinx-json")
-
-    // Ktor client (optional, remove if not needed)
-    implementation("io.ktor:ktor-client-core")
-    implementation("io.ktor:ktor-client-cio")
-
-    // Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-    implementation("com.charleskorn.kaml:kaml:0.104.0")
-
-    // Logging
-    implementation("ch.qos.logback:logback-classic:1.5.13")
-
-    // Testing
-    testImplementation("io.ktor:ktor-server-test-host")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+    systemProperty("frida.version", version as String)
 }
 
 kotlin {
@@ -50,4 +40,62 @@ kotlin {
 
 repositories {
     mavenCentral()
+}
+
+dependencies {
+    // Ktor Server
+    implementation("io.ktor:ktor-server-core:$ktor_version")
+    implementation("io.ktor:ktor-server-netty:$ktor_version")
+    implementation("io.ktor:ktor-server-websockets:$ktor_version")
+    implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
+    implementation("io.ktor:ktor-server-config-yaml:$ktor_version")
+
+    // Serialization
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+    implementation("io.ktor:ktor-serialization-gson:$ktor_version")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    // Ktor Client
+    implementation("io.ktor:ktor-client-cio:$ktor_version")
+
+    // Logging
+    implementation("ch.qos.logback:logback-classic:1.4.14")
+
+    // YAML
+    implementation("com.charleskorn.kaml:kaml:0.54.0")
+
+    // Exposed ORM
+    implementation("org.jetbrains.exposed:exposed-core:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-dao:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-json:0.47.0")
+
+    // Database
+    implementation("org.postgresql:postgresql:42.7.3")
+    implementation("com.zaxxer:HikariCP:5.1.0")
+
+    // Test
+    testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
+}
+
+tasks.register<Exec>("buildExe") {
+    dependsOn(tasks.shadowJar)
+
+    val jar = tasks.shadowJar.get().archiveFile.get().asFile
+    val outputDir = layout.buildDirectory.dir("exe").get().asFile
+
+    doFirst {
+        outputDir.mkdirs()
+    }
+
+    commandLine(
+        "jpackage",
+        "--input", jar.parent,
+        "--name", "MyServer",
+        "--main-jar", jar.name,
+        "--type", "exe",
+        "--dest", outputDir,
+        "--java-options", "-Xmx512m"
+    )
 }

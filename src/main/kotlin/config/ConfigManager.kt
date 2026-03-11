@@ -2,6 +2,7 @@ package com.example.config
 
 import java.io.File
 import com.charleskorn.kaml.Yaml
+import config.AppConfig
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 

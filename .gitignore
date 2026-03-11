@@ -44,3 +44,4 @@ bin/
 ### Mac OS ###
 .DS_Store
 /.dev/config.yaml
+/frontend/node_modules/
