@@ -1,5 +1,6 @@
 package routing
 
+import com.example.routing.RossTalkStatus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -52,4 +53,8 @@ sealed class ServerEvent {
     @Serializable
     @SerialName("RundownDeleted")
     data class RundownDeleted(val id: String) : ServerEvent()
+
+    @Serializable
+    @SerialName("RossTalkStatus")
+    data class RossTalkStatusChange(val status: RossTalkStatus) : ServerEvent()
 }

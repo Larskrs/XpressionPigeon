@@ -1,5 +1,4 @@
-// dashboard.socket.ts
-import { WebSocketManager } from "./shared/network/WebSocketManager"
+import { WebSocketManager } from "../shared/network/WebSocketManager"
 
 export function createSocket() {
     const proto = location.protocol === "https:" ? "wss" : "ws"
@@ -14,3 +13,4 @@ export type ServerEvent =
     | { type: "ContentUpdated"; sceneId: string; key: string; value: string }
     | { type: "SceneTaken";     sceneId: string }
     | { type: "SceneOut";       sceneId: string }
+    | { type: "RossTalkStatusChange";       status: string }

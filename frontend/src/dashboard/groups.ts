@@ -1,4 +1,3 @@
-// groups.ts
 export interface SceneGroup {
     label: string
     sceneIds: string[]
@@ -10,9 +9,5 @@ export const groups: SceneGroup[] = [
         label: "Person Supers",
         sceneIds: ["LeftPersonSuper", "RightPersonSuper"],
         flip_enabled: true,
-    },
-    {
-        label: "Theme",
-        sceneIds: ["ThemeSuper", "Location"],
-    },
+    }
 ]
