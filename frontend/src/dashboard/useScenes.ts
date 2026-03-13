@@ -1,7 +1,6 @@
 import { computed, reactive } from "vue"
 import { store } from "../shared/store.ts"
-import type {WebSocketManager} from "../shared/network/WebSocketManager.ts";
-import type {ServerEvent} from "./socket.ts";
+import type { WebSocketManager } from "../shared/network/WebSocketManager.ts"
 
 export interface SceneGroup {
     label: string
@@ -17,7 +16,12 @@ export const groups: SceneGroup[] = [
     },
 ]
 
-export function useScenes(socket: WebSocketManager<ServerEvent>) {
+type SceneClientEvent =
+    | { type: "TakeScene";      sceneId: string }
+    | { type: "OutScene";       sceneId: string }
+    | { type: "UpdateContent";  sceneId: string; key: string; value: string }
+
+export function useScenes(socket: WebSocketManager<SceneClientEvent>) {
     const sceneStates = reactive<Record<string, boolean>>({})
 
     const scenes = computed(() => {

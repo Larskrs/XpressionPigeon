@@ -1,4 +1,3 @@
-// Socket.kt
 package routing
 
 import com.example.routing.RossTalkClient
@@ -19,7 +18,6 @@ object WebSocket {
         ignoreUnknownKeys = true
     }
 
-    // Track all connected sessions
     private val sessions = mutableSetOf<DefaultWebSocketServerSession>()
     private val sessionsMutex = Mutex()
 
@@ -27,8 +25,8 @@ object WebSocket {
         sessionsMutex.withLock { sessions.add(session) }
 
         // On connect, send full current state to the new client
-        val initialState = ServerEvent.FullState(XmlDataStore.getAll())
-        session.send(json.encodeToString(ServerEvent.serializer(), initialState))
+        session.sendEvent(ServerEvent.FullState(XmlDataStore.getAll()))
+        session.sendEvent(ServerEvent.RundownList(RundownStore.list()))
 
         try {
             for (frame in session.incoming) {
@@ -36,8 +34,11 @@ object WebSocket {
                 val text = frame.readText()
 
                 when (val event = json.decodeFromString<WebSocketEvent>(text)) {
+
+                    // ── Scene ──────────────────────────────────────────────────
+
                     is WebSocketEvent.UpdateContent -> {
-                        println("Received update ${event.sceneId} ${event.key} ${event.value}")
+                        println("UpdateContent ${event.sceneId} ${event.key}=${event.value}")
                         XmlDataStore.update(event.sceneId, event.key, event.value)
                         broadcast(ServerEvent.ContentUpdated(event.sceneId, event.key, event.value))
                     }
@@ -59,24 +60,42 @@ object WebSocket {
                         broadcast(ServerEvent.SceneTaken(event.sceneId))
                     }
 
-
+                    // ── Rundown ────────────────────────────────────────────────
 
                     is WebSocketEvent.ListRundowns -> {
-                        val list = ServerEvent.RundownList(RundownStore.list())
-                        session.send(json.encodeToString(ServerEvent.serializer(), list))
+                        session.sendEvent(ServerEvent.RundownList(RundownStore.list()))
                     }
 
                     is WebSocketEvent.LoadRundown -> {
                         val rundown = RundownStore.get(event.id)
                         if (rundown != null) {
-                            val response = ServerEvent.RundownData(rundown.name, rundown.name, rundown.rows)
-                            session.send(json.encodeToString(ServerEvent.serializer(), response))
+                            session.sendEvent(
+                                ServerEvent.RundownData(rundown.id, rundown.name, rundown.pages)
+                            )
+                        } else {
+                            session.sendEvent(ServerEvent.RundownNotFound(event.id))
                         }
                     }
 
                     is WebSocketEvent.SaveRundown -> {
-                        val saved = RundownStore.save(event.id.ifBlank { event.name }, event.name, event.rows)
-                        broadcast(ServerEvent.RundownSaved(saved.name, saved.name))
+                        val previousId = event.id.ifBlank { null }
+                        val saved = RundownStore.save(event.id, event.name, event.pages)
+                        broadcast(
+                            ServerEvent.RundownSaved(
+                                id         = saved.id,
+                                name       = saved.name,
+                                previousId = previousId ?: saved.id
+                            )
+                        )
+                    }
+
+                    is WebSocketEvent.RenameRundown -> {
+                        val updated = RundownStore.rename(event.id, event.name)
+                        if (updated != null) {
+                            broadcast(ServerEvent.RundownRenamed(updated.id, updated.name))
+                        } else {
+                            session.sendEvent(ServerEvent.RundownNotFound(event.id))
+                        }
                     }
 
                     is WebSocketEvent.DeleteRundown -> {
@@ -85,7 +104,8 @@ object WebSocket {
                     }
 
                     is WebSocketEvent.FlushRundowns -> {
-                        //TODO:
+                        RundownStore.flushAll()
+                        session.sendEvent(ServerEvent.RundownsFlushed)
                     }
                 }
             }
@@ -102,4 +122,7 @@ object WebSocket {
         }
     }
 
+    private suspend fun DefaultWebSocketServerSession.sendEvent(event: ServerEvent) {
+        send(json.encodeToString(ServerEvent.serializer(), event))
+    }
 }
