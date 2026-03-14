@@ -159,6 +159,7 @@ export class WebSocketManager<TMessage = unknown> {
 
         this.reconnectTimer = setTimeout(() => {
             this.clearReconnect()
+            this.connect()
         }, this.options.retryDelay)
     }
 

@@ -9,7 +9,6 @@ export function useSocket(socket: WebSocketManager<ServerEvent>) {
 
         switch (type) {
             case "FullState":
-                console.log(event)
                 store.setValues(event.data)
                 break
             case "ContentUpdated":

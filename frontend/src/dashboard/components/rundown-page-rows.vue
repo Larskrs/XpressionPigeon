@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { ref, nextTick, toRaw, computed } from "vue"
+import { ref, nextTick, computed } from "vue"
 import type { Row } from "../useRundown.ts"
-import { formatTime } from "../useTimeFormat.ts"
-import { useReorder } from "../useReorder.ts"
-
-console.log("geg")
+import { formatTime, parseTimeInput } from "../useTimeFormat.ts"
 
 const props = defineProps<{
   rows:      Row[]
@@ -20,8 +17,23 @@ const emit = defineEmits<{
 }>()
 
 // ── Row reorder ───────────────────────────────────────────────────────────────
-const { draggingId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd } =
-    useReorder(() => props.rows, (rows) => emit("reorderRows", rows))
+function moveUp(index: number) {
+  if (index === 0) return
+  const items = [...props.rows]
+  const [item] = items.splice(index, 1)
+  if (!item) return
+  items.splice(index - 1, 0, item)
+  emit("reorderRows", items)
+}
+
+function moveDown(index: number) {
+  if (index >= props.rows.length - 1) return
+  const items = [...props.rows]
+  const [item] = items.splice(index, 1)
+  if (!item) return
+  items.splice(index + 1, 0, item)
+  emit("reorderRows", items)
+}
 
 // ── Add row ───────────────────────────────────────────────────────────────────
 const adding  = ref(false)
@@ -35,78 +47,71 @@ async function startAdd() {
   firstEl.value?.focus()
 }
 
-function parseTime(raw: string): number {
-  const parts = raw.trim().split(":").map(Number)
-  if (parts.some(isNaN)) return 0
-  if (parts.length === 3) return (((parts[0] ?? 0) * 60 + (parts[1] ?? 0)) * 60 + (parts[2] ?? 0)) * 1000
-  if (parts.length === 2) return ((parts[0] ?? 0) * 60 + (parts[1] ?? 0)) * 1000
-  return (parts[0] ?? 0) * 1000
-}
-
-function formatTimeForInput(ms: number): string {
-  if (!ms) return ""
-  const totalSecs = Math.floor(ms / 1000)
-  const h = Math.floor(totalSecs / 3600)
-  const m = Math.floor((totalSecs % 3600) / 60)
-  const s = totalSecs % 60
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-  return `${m}:${String(s).padStart(2, "0")}`
-}
-
 function commitAdd() {
   const name = draft.value.name.trim()
   adding.value = false
   emit("addRow", {
     id:        crypto.randomUUID(),
     name,
-    startTime: parseTime(draft.value.startTime),
-    duration:  parseTime(draft.value.duration),
+    startTime: parseTimeInput(draft.value.startTime),
+    duration:  parseTimeInput(draft.value.duration),
     notes:     draft.value.notes.trim(),
     values:    [],
   })
 }
 
-// ── Uncontrolled inline editing ───────────────────────────────────────────────
+// ── Inline editing ────────────────────────────────────────────────────────────
 type EditingField = "name" | "startTime" | "duration" | "notes"
 
-function seedValue(row: Row, field: EditingField): string {
+function displayValue(row: Row, field: EditingField): string {
   if (field === "name")      return row.name
-  if (field === "startTime") return formatTimeForInput(row.startTime)
-  if (field === "duration")  return formatTimeForInput(row.duration)
+  if (field === "startTime") return formatTime(row.startTime)
+  if (field === "duration")  return formatTime(row.duration)
   return row.notes
 }
 
-function onFocus(row: Row, field: EditingField, el: HTMLInputElement) {
-  el.value = seedValue(row, field)
+function onFocus(_rowId: string, _field: EditingField, _el: HTMLInputElement) {
+  // Keep the current formatted value — user edits in-place
 }
 
-function onBlur(row: Row, field: EditingField, el: HTMLInputElement) {
+function onBlur(rowId: string, field: EditingField, el: HTMLInputElement) {
   const value = el.value
 
-  if (field === "duration") el.value = formatTime(row.duration)
+  // Find the current row by ID from props to avoid stale reactive refs
+  const current = props.rows.find(r => r.id === rowId)
+  if (!current) return
 
-  const raw     = toRaw(row)
-  const updated: Row = { ...raw, values: raw.values.map(v => ({ ...v })) }
+  // Build a plain updated copy
+  const updated: Row = {
+    id:        current.id,
+    name:      current.name,
+    startTime: current.startTime,
+    duration:  current.duration,
+    notes:     current.notes,
+    values:    current.values.map(v => ({ ...v })),
+  }
   let changed = false
 
   if (field === "name") {
     const trimmed = value.trim()
-    if (!trimmed || trimmed === row.name) return
+    if (!trimmed || trimmed === current.name) { el.value = current.name; return }
     updated.name = trimmed
     changed = true
   } else if (field === "startTime") {
-    const parsed = parseTime(value)
-    if (parsed === row.startTime) return
+    const parsed = parseTimeInput(value)
+    el.value = formatTime(parsed)
+    if (parsed === current.startTime) return
     updated.startTime = parsed
     changed = true
   } else if (field === "duration") {
-    const parsed = parseTime(value)
-    if (parsed === row.duration) return
+    const parsed = parseTimeInput(value)
+    el.value = formatTime(parsed)
+    if (parsed === current.duration) return
     updated.duration = parsed
     changed = true
   } else if (field === "notes") {
     const trimmed = value.trim()
-    if (trimmed === row.notes) return
+    if (trimmed === current.notes) return
     updated.notes = trimmed
     changed = true
   }
@@ -114,14 +119,14 @@ function onBlur(row: Row, field: EditingField, el: HTMLInputElement) {
   if (changed) emit("updateRow", updated)
 }
 
-function onKeydown(e: KeyboardEvent, row: Row, field: EditingField, el: HTMLInputElement) {
+function onKeydown(e: KeyboardEvent, rowId: string, field: EditingField, el: HTMLInputElement) {
   if (e.key === "Enter") {
     e.preventDefault()
     el.blur()
   } else if (e.key === "Escape") {
     e.preventDefault()
-    if (field === "duration") el.value = formatTime(row.duration)
-    else el.value = seedValue(row, field)
+    const current = props.rows.find(r => r.id === rowId)
+    if (current) el.value = displayValue(current, field)
     el.blur()
   }
 }
@@ -147,7 +152,7 @@ const valueSummaries = computed(() => {
 </script>
 
 <template>
-  <div class="w-full" @dragover.stop.prevent @drop.stop.prevent @dragend.stop>
+  <div class="w-full">
 
     <!-- Empty state -->
     <div
@@ -157,80 +162,66 @@ const valueSummaries = computed(() => {
       No rows on this page
     </div>
 
-    <table v-else class="w-full table-fixed text-sm border-collapse">
-      <colgroup>
-        <col class="w-8" />
-        <col class="min-w-23" />
-        <col class="min-w-30 w-[20%]" />
-        <col class="min-w-20" />
-        <col class="min-w-20" />
-        <col class="w-[20%]" />
-        <col />
-        <col class="w-23" />
-      </colgroup>
+    <div v-else class="text-sm">
 
-      <thead>
-      <tr class="border-b border-zinc-800">
-        <th></th>
-        <th></th>
-        <th class="pl-3 pr-3 py-3 text-left text-xs font-semibold tracking-widest uppercase text-zinc-500">Name</th>
-        <th class="px-3 py-3 text-left text-xs font-semibold tracking-widest uppercase text-zinc-500 tabular-nums">Start</th>
-        <th class="px-3 py-3 text-left text-xs font-semibold tracking-widest uppercase text-zinc-500 tabular-nums">Duration</th>
-        <th class="px-3 py-3 text-left text-xs font-semibold tracking-widest uppercase text-zinc-500">Notes</th>
-        <th class="px-3 py-3 text-left text-xs font-semibold tracking-widest uppercase text-zinc-500">Values</th>
-        <th class="pr-4 py-3" />
-      </tr>
-      </thead>
+      <!-- Header -->
+      <div class="grid grid-cols-[2.5rem_5.75rem_1fr_5rem_5rem_1fr_1fr_5.75rem] border-b border-zinc-800">
+        <div></div>
+        <div></div>
+        <div class="pl-3 pr-3 py-3 text-left text-xs font-semibold tracking-widest uppercase text-zinc-500">Name</div>
+        <div class="px-3 py-3 text-left text-xs font-semibold tracking-widest uppercase text-zinc-500 tabular-nums">Start</div>
+        <div class="px-3 py-3 text-left text-xs font-semibold tracking-widest uppercase text-zinc-500 tabular-nums">Duration</div>
+        <div class="px-3 py-3 text-left text-xs font-semibold tracking-widest uppercase text-zinc-500">Notes</div>
+        <div class="px-3 py-3 text-left text-xs font-semibold tracking-widest uppercase text-zinc-500">Values</div>
+        <div class="pr-4 py-3"></div>
+      </div>
 
-      <tbody>
-      <tr
-          v-for="row in rows"
+      <!-- Rows -->
+      <div
+          v-for="(row, index) in rows"
           :key="row.id"
-          class="group border-b border-zinc-800/50 transition-colors"
-          :class="{
-            'hover:bg-zinc-800/40': !readonly,
-            'opacity-30': draggingId === row.id,
-          }"
-          @dragend="onDragEnd($event)"
+          class="group relative grid grid-cols-[2.5rem_5.75rem_1fr_5rem_5rem_1fr_1fr_5.75rem] items-center border-b border-zinc-800/50 transition-colors"
+          :class="{ 'hover:bg-zinc-800/40': !readonly }"
       >
 
-        <td
-            class="relative pl-2"
-            @dragover="onDragOver($event, row.id)"
-            @drop="onDrop($event, row.id)"
-        >
-          <div
-              class="absolute top-0 left-0 right-0 h-0.5 bg-blue-500 transition-opacity duration-100 pointer-events-none"
-              :class="dragOverId === row.id ? 'opacity-100' : 'opacity-0'"
-          />
-          <div
-              v-if="!readonly"
-              draggable="true"
-              class="flex items-center justify-center cursor-grab active:cursor-grabbing text-zinc-700 hover:text-zinc-400 transition-colors px-1 py-2"
-              title="Drag to reorder row"
-              @dragstart="onDragStart($event, row.id)"
+        <!-- Move up / down -->
+        <div v-if="!readonly" class="flex flex-col items-center justify-center">
+          <button
+              class="p-0.5 rounded text-zinc-700 hover:text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-20 disabled:pointer-events-none"
+              :disabled="index === 0"
+              title="Move up"
+              @click.stop="moveUp(index)"
           >
-            <svg viewBox="0 0 10 16" width="8" height="14" fill="currentColor">
-              <circle cx="3" cy="3"  r="1.2"/><circle cx="7" cy="3"  r="1.2"/>
-              <circle cx="3" cy="8"  r="1.2"/><circle cx="7" cy="8"  r="1.2"/>
-              <circle cx="3" cy="13" r="1.2"/><circle cx="7" cy="13" r="1.2"/>
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none">
+              <path d="M2 8l4-4 4 4" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-          </div>
-        </td>
+          </button>
+          <button
+              class="p-0.5 rounded text-zinc-700 hover:text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-20 disabled:pointer-events-none"
+              :disabled="index === rows.length - 1"
+              title="Move down"
+              @click.stop="moveDown(index)"
+          >
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none">
+              <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div v-else></div>
 
         <!-- Select -->
-        <td>
-          <div class="flex w-full items-center justify-center">
-            <button
-                class="px-4 py-1 rounded bg-primary-muted/25 hover:bg-primary hover:text-text text-primary transition-color duration-125 cursor-pointer text-sm font-medium"
-                title="Send this row's values to scenes"
-                @click.stop="emit('selectRow', row)"
-            >Select</button>
-          </div>
-        </td>
+        <div class="flex items-center justify-center">
+          <button
+              class="px-4 py-1 rounded bg-primary-muted/25 hover:bg-primary hover:text-text text-primary transition-color duration-125 cursor-pointer text-sm font-medium"
+              title="Send this row's values to scenes"
+              @click.stop="emit('selectRow', row)"
+          >Select</button>
+        </div>
 
         <!-- Name -->
-        <td class="pl-6 pr-3 py-2">
+        <div class="pl-6 pr-3 py-2">
           <input
               :value="row.name"
               :readonly="readonly"
@@ -238,46 +229,46 @@ const valueSummaries = computed(() => {
               :class="readonly
                   ? 'text-zinc-500 cursor-default select-none pointer-events-none'
                   : 'text-zinc-100 cursor-text hover:bg-zinc-800/60 focus:bg-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-600'"
-              @focus="onFocus(row, 'name', $event.target as HTMLInputElement)"
-              @blur="onBlur(row, 'name', $event.target as HTMLInputElement)"
-              @keydown="onKeydown($event, row, 'name', $event.target as HTMLInputElement)"
+              @focus="onFocus(row.id, 'name', $event.target as HTMLInputElement)"
+              @blur="onBlur(row.id, 'name', $event.target as HTMLInputElement)"
+              @keydown="onKeydown($event, row.id, 'name', $event.target as HTMLInputElement)"
           />
-        </td>
+        </div>
 
         <!-- Start -->
-        <td class="px-3 py-2 tabular-nums whitespace-nowrap">
+        <div class="px-3 py-2 tabular-nums whitespace-nowrap">
           <input
-              :value="formatTimeForInput(row.startTime)"
+              :value="formatTime(row.startTime)"
               :readonly="readonly"
-              placeholder="0:00"
+              placeholder="00:00"
               class="w-full bg-transparent px-2 py-1.5 rounded text-sm tabular-nums transition-colors"
               :class="readonly
                   ? 'text-zinc-600 cursor-default select-none pointer-events-none'
                   : 'text-zinc-400 cursor-text hover:bg-zinc-800/60 focus:bg-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-600'"
-              @focus="onFocus(row, 'startTime', $event.target as HTMLInputElement)"
-              @blur="onBlur(row, 'startTime', $event.target as HTMLInputElement)"
-              @keydown="onKeydown($event, row, 'startTime', $event.target as HTMLInputElement)"
+              @focus="onFocus(row.id, 'startTime', $event.target as HTMLInputElement)"
+              @blur="onBlur(row.id, 'startTime', $event.target as HTMLInputElement)"
+              @keydown="onKeydown($event, row.id, 'startTime', $event.target as HTMLInputElement)"
           />
-        </td>
+        </div>
 
         <!-- Duration -->
-        <td class="px-3 py-2 tabular-nums whitespace-nowrap">
+        <div class="px-3 py-2 tabular-nums whitespace-nowrap">
           <input
               :value="formatTime(row.duration)"
               :readonly="readonly"
-              placeholder="0:00"
+              placeholder="00:00"
               class="w-full bg-transparent px-2 py-1.5 rounded text-sm tabular-nums transition-colors"
               :class="readonly
                   ? 'text-zinc-600 cursor-default select-none pointer-events-none'
                   : 'text-zinc-400 cursor-text hover:bg-zinc-800/60 focus:bg-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-600'"
-              @focus="onFocus(row, 'duration', $event.target as HTMLInputElement)"
-              @blur="onBlur(row, 'duration', $event.target as HTMLInputElement)"
-              @keydown="onKeydown($event, row, 'duration', $event.target as HTMLInputElement)"
+              @focus="onFocus(row.id, 'duration', $event.target as HTMLInputElement)"
+              @blur="onBlur(row.id, 'duration', $event.target as HTMLInputElement)"
+              @keydown="onKeydown($event, row.id, 'duration', $event.target as HTMLInputElement)"
           />
-        </td>
+        </div>
 
         <!-- Notes -->
-        <td class="px-3 py-2">
+        <div class="px-3 py-2">
           <input
               :value="row.notes"
               :readonly="readonly"
@@ -286,21 +277,21 @@ const valueSummaries = computed(() => {
               :class="readonly
                   ? 'text-zinc-600 cursor-default select-none pointer-events-none'
                   : 'text-zinc-500 cursor-text hover:bg-zinc-800/60 focus:bg-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-600'"
-              @focus="onFocus(row, 'notes', $event.target as HTMLInputElement)"
-              @blur="onBlur(row, 'notes', $event.target as HTMLInputElement)"
-              @keydown="onKeydown($event, row, 'notes', $event.target as HTMLInputElement)"
+              @focus="onFocus(row.id, 'notes', $event.target as HTMLInputElement)"
+              @blur="onBlur(row.id, 'notes', $event.target as HTMLInputElement)"
+              @keydown="onKeydown($event, row.id, 'notes', $event.target as HTMLInputElement)"
           />
-        </td>
+        </div>
 
         <!-- Values summary -->
-        <td class="px-3 py-2">
+        <div class="px-3 py-2">
           <span class="block truncate text-zinc-600 text-xs font-mono px-2 py-1.5">
             {{ valueSummaries[row.id] }}
           </span>
-        </td>
+        </div>
 
         <!-- Actions -->
-        <td class="py-2">
+        <div class="py-2">
           <div
               v-if="!readonly"
               class="flex w-full items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -311,14 +302,16 @@ const valueSummaries = computed(() => {
                 @click.stop="emit('captureRow', row)"
             >Update</button>
           </div>
-        </td>
-      </tr>
+        </div>
+      </div>
 
       <!-- Add row form -->
-      <tr v-if="adding && !readonly" class="bg-zinc-800/20 border-t border-zinc-700/50">
-        <td></td>
-        <td></td>
-        <td class="pl-6 pr-3 py-3">
+      <div v-if="adding && !readonly"
+           class="grid grid-cols-[2.5rem_5.75rem_1fr_5rem_5rem_1fr_1fr_5.75rem] items-center bg-zinc-800/20 border-t border-zinc-700/50"
+      >
+        <div></div>
+        <div></div>
+        <div class="pl-6 pr-3 py-3">
           <input
               ref="firstEl"
               v-model="draft.name"
@@ -327,8 +320,8 @@ const valueSummaries = computed(() => {
               @keydown.enter="commitAdd"
               @keydown.esc="adding = false"
           />
-        </td>
-        <td class="px-3 py-3">
+        </div>
+        <div class="px-3 py-3">
           <input
               v-model="draft.startTime"
               placeholder="00:00"
@@ -336,8 +329,8 @@ const valueSummaries = computed(() => {
               @keydown.enter="commitAdd"
               @keydown.esc="adding = false"
           />
-        </td>
-        <td class="px-3 py-3">
+        </div>
+        <div class="px-3 py-3">
           <input
               v-model="draft.duration"
               placeholder="00:00"
@@ -345,8 +338,8 @@ const valueSummaries = computed(() => {
               @keydown.enter="commitAdd"
               @keydown.esc="adding = false"
           />
-        </td>
-        <td class="px-3 py-3" colspan="3">
+        </div>
+        <div class="px-3 py-3 col-span-3">
           <div class="flex items-center gap-2">
             <input
                 v-model="draft.notes"
@@ -364,10 +357,9 @@ const valueSummaries = computed(() => {
                 @click="adding = false"
             >✕</button>
           </div>
-        </td>
-      </tr>
-      </tbody>
-    </table>
+        </div>
+      </div>
+    </div>
 
     <!-- Add row button -->
     <div v-if="!readonly" class="pl-6 pr-6 py-4 border-t border-zinc-800/50">

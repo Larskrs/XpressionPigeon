@@ -1,6 +1,6 @@
 <!-- SceneInput.vue -->
 <script setup lang="ts">
-import { ref, watch } from "vue"
+import { ref, watch, onBeforeUnmount } from "vue"
 
 const props = defineProps<{
   label: string
@@ -21,6 +21,10 @@ const justCommitted = ref(false)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+onBeforeUnmount(() => {
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+})
 
 watch(() => props.modelValue, (val) => {
   if (!isFocused.value) localValue.value = val

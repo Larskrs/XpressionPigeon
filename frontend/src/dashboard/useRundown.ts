@@ -201,7 +201,6 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
             return
         }
         state.current.pages.push(page)
-        console.log("addPage: pushed", page.name, "— current has", state.current.pages.length, "pages")
     }
 
     function removePage(pageId: string) {
@@ -210,7 +209,6 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
     }
 
     function addRow(pageId: string, row: Row) {
-        console.log("called add row")
         const page = state.current?.pages.find(p => p.id === pageId)
         page?.rows.push(row)
     }

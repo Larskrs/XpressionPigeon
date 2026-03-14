@@ -16,7 +16,10 @@ onMounted(() => {
   socket.connect()
   listRundowns()
 })
-onBeforeUnmount(() => socket.disconnect())
+onBeforeUnmount(() => {
+  player.stop()
+  socket.disconnect()
+})
 
 const { scenes, sceneStates, takeScene, outScene, updateField, handleFlip } = useScenes(socket)
 const {
@@ -39,7 +42,8 @@ const player = usePagePlayer({ scenes, updateField, takeScene, outScene })
 // ── Stable event handlers ─────────────────────────────────────────────────────
 
 function onRename(name: string) {
-  renameRundown(rundownState.current!.id, name)
+  if (!rundownState.current) return
+  renameRundown(rundownState.current.id, name)
 }
 
 function onAddPage(page: Page) {
@@ -53,7 +57,8 @@ function onRemovePage(pageId: string) {
 }
 
 function onReorder(pages: Page[]) {
-  rundownState.current!.pages = pages
+  if (!rundownState.current) return
+  rundownState.current.pages = pages
   saveRundown()
 }
 
@@ -100,13 +105,11 @@ function onSelectRow(row: Row) {
 }
 
 function onCaptureRow(pageId: string, row: Row) {
-  console.log("Captured")
   const captured = Object.entries(scenes.value).flatMap(([sceneId, fields]) =>
       Object.entries(fields)
           .filter(([, value]) => value !== "")
           .map(([field, value]) => ({ name: `${sceneId}.${field}`, value }))
   )
-  console.log(captured)
   const page   = rundownState.current?.pages.find(p => p.id === pageId)
   const target = page?.rows.find(r => r.id === row.id)
   if (target) {
