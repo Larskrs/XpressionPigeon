@@ -27,7 +27,7 @@ data class Page(
 data class Row(
     val name: String,
     val startTime: Long,
-    val endTime: Long,
+    val duration: Long,
     val notes: String,
     val values: List<Parameter>
 )

@@ -14,6 +14,10 @@ export const groups: SceneGroup[] = [
         sceneIds: ["LeftPersonSuper", "RightPersonSuper"],
         flip_enabled: true,
     },
+    {
+        label: "Theme & Location",
+        sceneIds: ["ThemeSuper", "Location"]
+    }
 ]
 
 type SceneClientEvent =

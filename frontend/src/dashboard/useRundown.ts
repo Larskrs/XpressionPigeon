@@ -1,4 +1,4 @@
-import { reactive, computed } from "vue"
+import {reactive, computed } from "vue"
 import type { WebSocketManager } from "../shared/network/WebSocketManager"
 import type { ServerEvent } from "./socket"
 
@@ -10,9 +10,10 @@ export interface Parameter {
 }
 
 export interface Row {
+    id: string
     name: string
     startTime: number
-    endTime: number
+    duration: number
     notes: string
     values: Parameter[]
 }
@@ -33,19 +34,6 @@ export interface RundownMeta {
     id: string
     name: string
 }
-
-// ─── Augment ServerEvent ──────────────────────────────────────────────────────
-// Add these to the ServerEvent union in socket.ts:
-//
-//   | { type: "RundownList";    rundowns: RundownMeta[] }
-//   | { type: "RundownData";    id: string; name: string; rows: Page[] }
-//   | { type: "RundownSaved";   id: string; name: string; previousId: string }
-//   | { type: "RundownRenamed"; id: string; name: string }
-//   | { type: "RundownDeleted"; id: string }
-//   | { type: "RundownNotFound"; id: string }
-//   | { type: "RundownsFlushed" }
-
-// ─── State ────────────────────────────────────────────────────────────────────
 
 interface RundownState {
     /** Lightweight index — all known rundowns */
@@ -91,23 +79,24 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
 
             case "RundownData": {
                 const e = event as any
-                state.current = { id: e.id, name: e.name, pages: e.rows }
+                state.current = { id: e.id, name: e.name, pages: e.pages }
                 state.loading = false
                 break
             }
 
             case "RundownSaved": {
                 const e = event as any
-                console.log(e)
-                console.log()
-                // Update index entry — handle new rundowns (previousId differs)
+                // Update or insert the index entry, using previousId to find the old slot
                 const idx = state.index.findIndex(r => r.id === e.previousId)
                 if (idx !== -1) {
                     state.index[idx] = { id: e.id, name: e.name }
                 } else {
-                    state.index.push({ id: e.id, name: e.name })
+                    // Only add if not already present (avoid duplicate on broadcast to other clients)
+                    if (!state.index.some(r => r.id === e.id)) {
+                        state.index.push({ id: e.id, name: e.name })
+                    }
                 }
-                // Patch current if it was the one being saved
+                // Patch current's id in case this was a new rundown getting its real UUID
                 if (state.current && state.current.id === e.previousId) {
                     state.current.id   = e.id
                     state.current.name = e.name
@@ -221,8 +210,16 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
     }
 
     function addRow(pageId: string, row: Row) {
+        console.log("called add row")
         const page = state.current?.pages.find(p => p.id === pageId)
         page?.rows.push(row)
+    }
+
+    function updateRow(pageId: string, row: Row) {
+        const page = state.current?.pages.find(p => p.id === pageId)
+        if (!page) return
+        const index = page.rows.findIndex(r => r.id === row.id)
+        if (index !== -1) page.rows[index] = row  // ← was: toRaw(row)
     }
 
     function removeRow(pageId: string, rowName: string) {
@@ -255,6 +252,7 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
         addPage,
         removePage,
         addRow,
+        updateRow,
         removeRow,
         updateParameter,
     }

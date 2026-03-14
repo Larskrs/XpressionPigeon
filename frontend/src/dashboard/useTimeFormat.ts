@@ -7,7 +7,3 @@ export function formatTime(ms: number): string {
         .filter(Boolean)
         .join(":")
 }
-
-export function duration(startTime: number, endTime: number): string {
-    return formatTime(endTime - startTime)
-}

@@ -18,6 +18,11 @@ const emit = defineEmits<{
 function fromCamel(str: string): string {
   return str.replace(/([A-Z])/g, " $1").trim()
 }
+function clearValues() {
+  for (const [key, _] of Object.entries(props.fields)) {
+    emit("update", props.sceneId, String(key), "")
+  }
+}
 </script>
 
 <template>
@@ -58,11 +63,17 @@ function fromCamel(str: string): string {
       </button>
       <button class="flex justify-center items-center gap-2"
           @click="emit('out', sceneId)"
-          :disabled="!isOn"
           :class="['flex-1 py-2 text-sm font-medium rounded border transition-colors',
             isOn ? 'border-zinc-600 text-zinc-300 hover:bg-zinc-700' : 'border-zinc-700 text-zinc-600 cursor-default']"
       >
         <Icon class="size-5" icon="tabler:arrow-down"/> Out
+      </button>
+      <button class="max-w-8 flex justify-center items-center gap-2"
+          @click="clearValues"
+          :class="['flex-1 py-2 text-sm font-medium rounded border transition-colors',
+            isOn ? 'border-zinc-600 text-zinc-300 hover:bg-zinc-700' : 'border-zinc-700 text-zinc-600 cursor-default']"
+      >
+        <Icon class="size-5" icon="tabler:trash"/>
       </button>
     </div>
   </div>

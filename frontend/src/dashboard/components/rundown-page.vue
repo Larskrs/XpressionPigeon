@@ -2,14 +2,16 @@
 import { ref, nextTick } from "vue"
 import type { Page, Row } from "../useRundown.ts"
 import RundownPageRows from "./rundown-page-rows.vue"
+import { Icon } from "@iconify/vue";
 
 const props = defineProps<{
-  page:       Page
-  index:      number
-  isLast:     boolean
-  isOpen:     boolean
-  isDragging: boolean
-  isDragOver: boolean
+  page:          Page
+  index:         number
+  isLast:        boolean
+  isOpen:        boolean
+  isDragging:    boolean
+  isDragOver:    boolean
+  isActivePage?: boolean   // true when this page is loaded in the player
 }>()
 
 const emit = defineEmits<{
@@ -17,6 +19,11 @@ const emit = defineEmits<{
   rename:      [name: string]
   remove:      []
   addRow:      [row: Row]
+  updateRow:   [row: Row]
+  reorderRows: [rows: Row[]]
+  selectRow:   [row: Row]
+  captureRow:  [row: Row]
+  playPage:    []
   moveUp:      []
   moveDown:    []
   dragstart:   [e: DragEvent]
@@ -46,14 +53,24 @@ function commitRename() {
 
 // ── Delete confirmation ───────────────────────────────────────────────────────
 const confirming = ref(false)
+
+// ── Page drag — only initiated from the handle, not from row content ──────────
+// The root div is NOT draggable. Instead we set draggable on the handle itself
+// and forward the events up so the parent rundown.vue reorder logic still works.
+function onHandleDragStart(e: DragEvent) {
+  emit("dragstart", e)
+}
 </script>
 
 <template>
+  <!--
+    No draggable="true" here — dragging is initiated exclusively from the handle
+    below. We still need dragover/drop/dragend on the root so the parent can
+    use this element as a drop target for page reordering.
+  -->
   <div
       class="group transition-opacity"
       :class="{ 'opacity-30': isDragging }"
-      draggable="true"
-      @dragstart="emit('dragstart', $event)"
       @dragover="emit('dragover', $event)"
       @drop="emit('drop', $event)"
       @dragend="emit('dragend')"
@@ -65,12 +82,21 @@ const confirming = ref(false)
     />
 
     <!-- Page header -->
-    <div class="flex items-center gap-1 px-2 py-2 hover:bg-zinc-800/40 transition-colors">
+    <div
+        class="flex items-center gap-1 px-2 py-0 hover:bg-zinc-800/40 transition-colors"
+        :class="{ 'bg-emerald-950/40 border-l-2 border-emerald-500': isActivePage }"
+    >
 
-      <!-- Drag handle -->
+      <!--
+        Drag handle — this is the only element that is draggable="true".
+        Using @mousedown to set draggable on the parent would leak; instead we
+        make the handle itself the draggable element and emit the event upward.
+      -->
       <span
+          draggable="true"
           class="cursor-grab active:cursor-grabbing text-zinc-700 hover:text-zinc-400 px-1 py-1 transition-colors shrink-0"
           title="Drag to reorder"
+          @dragstart.stop="onHandleDragStart"
       >
         <svg viewBox="0 0 10 16" width="10" height="16" fill="currentColor">
           <circle cx="3" cy="3"  r="1.2"/><circle cx="7" cy="3"  r="1.2"/>
@@ -80,7 +106,7 @@ const confirming = ref(false)
       </span>
 
       <!-- Chevron + name -->
-      <button class="flex items-center gap-2 flex-1 text-left min-w-0" @click="emit('toggle')">
+      <button class="flex items-center gap-2 flex-1 py-2 text-left min-w-0" @click="emit('toggle')">
         <svg
             class="w-3 h-3 shrink-0 text-zinc-500 transition-transform duration-150"
             :class="{ 'rotate-90': isOpen }"
@@ -138,25 +164,25 @@ const confirming = ref(false)
         </button>
 
         <button
+            class="p-1 rounded text-zinc-600 hover:text-emerald-400 hover:bg-zinc-700 transition-colors"
+            :class="{ 'text-emerald-500': isActivePage }"
+            title="Play this page"
+            @click.stop="emit('playPage')"
+        ><Icon class="size-4" icon="tabler:player-play" />
+        </button>
+
+        <button
             class="p-1 rounded text-zinc-600 hover:text-zinc-300 hover:bg-zinc-700 transition-colors"
             title="Rename page"
             @click.stop="startRename"
-        >
-          <svg viewBox="0 0 12 12" width="12" height="12" fill="none">
-            <path d="M2 10h8M7.5 2.5l2 2-5 5H2.5v-2l5-5z" stroke="currentColor"
-                  stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+        ><Icon class="size-4" icon="tabler:edit" />
         </button>
 
         <button
             class="p-1 rounded text-zinc-600 hover:text-red-400 hover:bg-zinc-700 transition-colors"
             title="Delete page"
             @click.stop="confirming = true"
-        >
-          <svg viewBox="0 0 12 12" width="12" height="12" fill="none">
-            <path d="M2 3h8M5 3V2h2v1M4 3v7h4V3H4z" stroke="currentColor"
-                  stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+        ><Icon class="size-4" icon="tabler:trash" />
         </button>
       </div>
     </div>
@@ -177,7 +203,15 @@ const confirming = ref(false)
       >Cancel</button>
     </div>
 
-    <!-- Expanded rows -->
-    <RundownPageRows v-if="isOpen" :rows="page.rows" @add-row="emit('addRow', $event)" />
+    <!-- Expanded rows — all drag events are stopped inside RundownPageRows -->
+    <RundownPageRows
+        v-if="isOpen"
+        :rows="page.rows"
+        @add-row="emit('addRow', $event)"
+        @update-row="emit('updateRow', $event)"
+        @reorder-rows="emit('reorderRows', $event)"
+        @select-row="emit('selectRow', $event)"
+        @capture-row="emit('captureRow', $event)"
+    />
   </div>
 </template>

@@ -45,7 +45,7 @@ sealed class ServerEvent {
     data class RundownData(
         val id: String,
         val name: String,
-        val rows: List<Page>
+        val pages: List<Page>
     ) : ServerEvent()
 
     /**
