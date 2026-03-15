@@ -19,12 +19,16 @@ data class Rundown(
 @Serializable
 data class Page(
     val id: String,
+    val color: String? = null,
+    val order: Int,
     val name: String,
     val rows: List<Row>
 )
 
 @Serializable
 data class Row(
+    val id: String,
+    val order: Int = 0,
     val name: String,
     val startTime: Long,
     val duration: Long,
@@ -116,6 +120,7 @@ object RundownStore {
     private fun loadAll() {
         rundownsDir.listFiles { f -> f.extension == "json" }?.forEach { file ->
             try {
+                println("Loading ${file.name}")
                 val rundown = json.decodeFromString<Rundown>(file.readText())
                 rundowns[rundown.id] = rundown
             } catch (e: Exception) {

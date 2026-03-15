@@ -1,5 +1,5 @@
 import { ref, shallowRef, computed, readonly } from "vue"
-import type { ComputedRef } from "vue"
+import { onMounted, onUnmounted, type ComputedRef } from "vue"
 import type { Page, Row } from "./useRundown.ts"
 
 export interface PlayerSceneApi {
@@ -14,6 +14,10 @@ export type PlayerStatus = "idle" | "playing" | "paused"
 const TICK_MS = 50
 
 export function usePagePlayer(api: PlayerSceneApi) {
+
+// inside usePagePlayer, after defining the functions:
+    onMounted(() => window.addEventListener('keydown', onKeyDown))
+    onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 
     // ── State ─────────────────────────────────────────────────────────────────
 
@@ -35,7 +39,7 @@ export function usePagePlayer(api: PlayerSceneApi) {
     const totalDuration = computed<number>(() => {
         let max = 0
         for (const row of rows.value) {
-            const end = row.startTime + row.duration
+            const end = (row.startTime + row.duration) * 1000
             if (end > max) max = end
         }
         return max
@@ -51,12 +55,13 @@ export function usePagePlayer(api: PlayerSceneApi) {
      * the current playhead. Returns null when the playhead is in a gap.
      * Rows with duration === 0 are never auto-matched (they require manual advance).
      */
+
     const rowAtPlayhead = computed<Row | null>(() => {
         const t = elapsed.value
         for (const row of rows.value) {
-            if (row.startTime > t) break          // rows past playhead — no match possible
+            if (row.startTime * 1000 > t) break
             if (row.duration === 0) continue
-            if (t < row.startTime + row.duration) return row
+            if (t < (row.startTime + row.duration) * 1000) return row
         }
         return null
     })
@@ -96,7 +101,7 @@ export function usePagePlayer(api: PlayerSceneApi) {
 
     /** Out all scenes and clear the active row. */
     function outAll() {
-        for (const sceneId of Object.keys(api.scenes.value)) {
+        for (const [sceneId] of Object.entries(api.scenes.value)) {
             api.outScene(sceneId)
         }
         activeRow.value = null
@@ -208,14 +213,14 @@ export function usePagePlayer(api: PlayerSceneApi) {
     function jumpToRow(index: number) {
         const row = rows.value[index]
         if (!row) return
-        seekTo(row.startTime)
+        seekTo(row.startTime * 1000)
     }
 
     /** Index of the row whose window contains the playhead, or -1. */
     const activeRowIndex = computed(() => {
         const t = elapsed.value
         return rows.value.findIndex(r =>
-            r.duration > 0 && t >= r.startTime && t < r.startTime + r.duration
+            r.duration > 0 && t >= r.startTime * 1000 && t < (r.startTime + r.duration) * 1000
         )
     })
 
@@ -223,27 +228,53 @@ export function usePagePlayer(api: PlayerSceneApi) {
     function skipNext() {
         const idx = activeRowIndex.value
         const next = idx === -1
-            ? rows.value.find(r => r.startTime > elapsed.value)
+            ? rows.value.find(r => r.startTime * 1000 > elapsed.value)
             : rows.value[idx + 1]
-        if (next) seekTo(next.startTime)
+        if (next) seekTo(next.startTime * 1000)
     }
 
     /** Skip to the previous row's start time, or restart the current one. */
     function skipPrev() {
         const idx = activeRowIndex.value
         if (idx > 0) {
-            seekTo(rows.value[idx - 1]!.startTime)
+            seekTo(rows.value[idx - 1]!.startTime * 1000)
         } else if (idx === 0) {
             seekTo(0)
         } else {
             // In a gap — find the last row before the playhead
             for (let i = rows.value.length - 1; i >= 0; i--) {
-                if (rows.value[i]!.startTime < elapsed.value) {
-                    seekTo(rows.value[i]!.startTime)
+                if (rows.value[i]!.startTime * 1000 < elapsed.value) {
+                    seekTo(rows.value[i]!.startTime * 1000)
                     return
                 }
             }
             seekTo(0)
+        }
+    }
+
+    function isInputFocused(): boolean {
+        const el = document.activeElement
+        if (!el) return false
+        const tag = el.tagName.toLowerCase()
+        return tag === 'input' || tag === 'textarea' || tag === 'select'
+            || (el as HTMLElement).isContentEditable
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+        if (isInputFocused()) return
+
+        if (e.code === 'Space') {
+            e.preventDefault()
+            togglePlay()
+        } else if (e.code === "ArrowDown") {
+            e.preventDefault()
+            clearAllScenes()
+        } else if (e.code === 'ArrowRight') {
+            e.preventDefault()
+            skipNext()
+        } else if (e.code === 'ArrowLeft') {
+            e.preventDefault()
+            skipPrev()
         }
     }
 

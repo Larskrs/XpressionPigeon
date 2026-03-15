@@ -1,4 +1,4 @@
-import {reactive, computed } from "vue"
+import {reactive, toRaw} from "vue"
 import type { WebSocketManager } from "../shared/network/WebSocketManager"
 import type { ServerEvent } from "./socket"
 
@@ -11,6 +11,7 @@ export interface Parameter {
 
 export interface Row {
     id: string
+    order: number
     name: string
     startTime: number
     duration: number
@@ -20,6 +21,7 @@ export interface Row {
 
 export interface Page {
     id: string
+    order: number
     name: string
     rows: Row[]
 }
@@ -36,14 +38,10 @@ export interface RundownMeta {
 }
 
 interface RundownState {
-    /** Lightweight index — all known rundowns */
-    index: RundownMeta[]
-    /** The currently loaded rundown, if any */
+    index:   RundownMeta[]
     current: Rundown | null
-    /** True while a load/save request is in flight */
     loading: boolean
-    /** Last error message, cleared on next successful operation */
-    error: string | null
+    error:   string | null
 }
 
 // ─── Composable ───────────────────────────────────────────────────────────────
@@ -55,16 +53,6 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
         loading: false,
         error:   null,
     })
-
-    // ── Derived ───────────────────────────────────────────────────────────────
-
-    /** True when a rundown is open and has at least one page */
-    const hasPages = computed(() => (state.current?.pages.length ?? 0) > 0)
-
-    /** Flat list of all rows across all pages in the current rundown */
-    const allRows = computed(() =>
-        state.current?.pages.flatMap(page => page.rows) ?? []
-    )
 
     // ── Server → client ───────────────────────────────────────────────────────
 
@@ -86,17 +74,14 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
 
             case "RundownSaved": {
                 const e = event as any
-                // Update or insert the index entry, using previousId to find the old slot
                 const idx = state.index.findIndex(r => r.id === e.previousId)
                 if (idx !== -1) {
                     state.index[idx] = { id: e.id, name: e.name }
                 } else {
-                    // Only add if not already present (avoid duplicate on broadcast to other clients)
                     if (!state.index.some(r => r.id === e.id)) {
                         state.index.push({ id: e.id, name: e.name })
                     }
                 }
-                // Patch current's id in case this was a new rundown getting its real UUID
                 if (state.current && state.current.id === e.previousId) {
                     state.current.id   = e.id
                     state.current.name = e.name
@@ -126,57 +111,38 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
                 state.loading = false
                 break
             }
-
-            case "RundownsFlushed":
-                state.loading = false
-                break
         }
     })
 
     // ── Client → server ───────────────────────────────────────────────────────
 
-    /** Fetch the lightweight index of all rundowns. */
     function listRundowns() {
         state.loading = true
         socket.send({ type: "ListRundowns" })
     }
 
-    /** Load the full data for a single rundown by id. */
     function loadRundown(id: string) {
         state.loading = true
         state.error   = null
         socket.send({ type: "LoadRundown", id })
     }
 
-    /**
-     * Save the currently loaded rundown.
-     * Pass an explicit rundown to save something other than state.current.
-     */
-    function saveRundown(rundown: Rundown = state.current!) {
+    function saveRundown(r: Rundown = state.current!) {
+        const rundown = toRaw(r)
         if (!rundown) return
         state.loading = true
         state.error   = null
-        socket.send({
-            type: "SaveRundown",
-            id:   rundown.id,
-            name: rundown.name,
-            pages: rundown.pages,
-        })
+        console.log(rundown)
+        socket.send({ type: "SaveRundown", id: rundown.id, name: rundown.name, pages: rundown.pages })
     }
 
-    /**
-     * Create a brand-new rundown (blank id → server assigns a UUID).
-     * The returned shell is stored as current; it will be patched with
-     * the real id once the server replies with RundownSaved.
-     */
     function createRundown(name: string, pages: Page[] = []) {
-        state.current = { id: "", name, pages: pages }
+        state.current = { id: "", name, pages }
         state.loading = true
         state.error   = null
-        socket.send({ type: "SaveRundown", id: "", name, pages: pages })
+        socket.send({ type: "SaveRundown", id: "", name, pages })
     }
 
-    /** Rename without touching page data. More efficient than a full save. */
     function renameRundown(id: string, name: string) {
         socket.send({ type: "RenameRundown", id, name })
     }
@@ -185,73 +151,72 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
         socket.send({ type: "DeleteRundown", id })
     }
 
-    /** Force an immediate server-side disk flush of all dirty rundowns. */
-    function flushRundowns() {
-        state.loading = true
-        socket.send({ type: "FlushRundowns" })
-    }
-
     // ── Local mutation helpers ────────────────────────────────────────────────
-    // These patch state.current in place without a round-trip.
-    // Call saveRundown() afterward to persist.
 
     function addPage(page: Page) {
-        if (!state.current) {
-            console.warn("addPage: no current rundown loaded")
-            return
-        }
+        if (!state.current) return
+
+        const maxOrder =
+            Math.max(-1, ...state.current.pages.map(p => p.order))
+
+        page.order = maxOrder + 1
+
         state.current.pages.push(page)
+        state.current.pages = sortPages(state.current.pages)
     }
 
     function removePage(pageId: string) {
         if (!state.current) return
-        state.current.pages = state.current.pages.filter(p => p.id !== pageId)
+
+        state.current.pages =
+            state.current.pages.filter(p => p.id !== pageId)
+    }
+
+    function removeRow(pageId: string, rowId: string) {
+        const page = state.current?.pages.find(p => p.id === pageId)
+        if (!page) return
+
+        page.rows = page.rows.filter((row) => row.id !== rowId)
     }
 
     function addRow(pageId: string, row: Row) {
         const page = state.current?.pages.find(p => p.id === pageId)
-        page?.rows.push(row)
+        if (!page) return
+
+        page.rows.push(row)
+        page.rows = sortRows(page.rows)
     }
 
-    function updateRow(pageId: string, row: Row) {
+    function updateRow(pageId: string, updated: Row) {
         const page = state.current?.pages.find(p => p.id === pageId)
         if (!page) return
-        const index = page.rows.findIndex(r => r.id === row.id)
-        if (index !== -1) page.rows[index] = row  // ← was: toRaw(row)
+
+        const i = page.rows.findIndex(r => r.id === updated.id)
+        if (i === -1) return
+
+        page.rows[i] = updated
     }
 
-    function removeRow(pageId: string, rowName: string) {
-        const page = state.current?.pages.find(p => p.id === pageId)
-        if (!page) return
-        page.rows = page?.rows.filter((r: Row) => r.name !== rowName)
+    function sortPages(pages: Page[]) {
+        return [...pages].sort((a, b) => a.order - b.order)
     }
 
-    function updateParameter(pageId: string, rowName: string, paramName: string, value: string) {
-        const page = state.current?.pages.find(p => p.id === pageId)
-        const row  = page?.rows.find(r => r.name === rowName)
-        const param = row?.values.find(v => v.name === paramName)
-        if (param) param.value = value
+    function sortRows(rows: Row[]) {
+        return [...rows].sort((a, b) => a.order - b.order)
     }
 
     return {
-        // State
         state,
-        hasPages,
-        allRows,
-        // Server ops
         listRundowns,
         loadRundown,
         saveRundown,
         createRundown,
         renameRundown,
         deleteRundown,
-        flushRundowns,
-        // Local mutation
         addPage,
         removePage,
         addRow,
         updateRow,
-        removeRow,
-        updateParameter,
+        removeRow
     }
 }

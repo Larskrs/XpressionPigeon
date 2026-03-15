@@ -33,6 +33,7 @@ const {
   removePage,
   addRow,
   updateRow,
+  removeRow
 } = useRundown(socket)
 
 // ── Page player ───────────────────────────────────────────────────────────────
@@ -68,20 +69,17 @@ function onRenamePage(pageId: string, name: string) {
 }
 
 function onAddRow(pageId: string, row: Row) {
+  console.log(row)
   addRow(pageId, row)
   saveRundown()
 }
 
 function onUpdateRow(pageId: string, row: Row) {
-  const page   = rundownState.current?.pages.find(p => p.id === pageId)
-  const target = page?.rows.find(r => r.id === row.id)
-  if (target) {
-    target.name      = row.name
-    target.startTime = row.startTime
-    target.duration  = row.duration
-    target.notes     = row.notes
-    // do NOT reassign target.values — leave the reactive array in place
-  }
+  updateRow(pageId, row)
+  saveRundown()
+}
+function onRemoveRow(pageId: string, rowId: string) {
+  removeRow(pageId, rowId)
   saveRundown()
 }
 
@@ -101,6 +99,26 @@ function onSelectRow(row: Row) {
       if (newValue === currentValue) continue
       updateField(sceneId, field, newValue)
     }
+  }
+}
+
+function onTakeRow(row: Row) {
+  const rowValues = new Map(row.values.map(p => [p.name, p.value]))
+
+  for (const [sceneId, fields] of Object.entries(scenes.value)) {
+    let hasValue = false
+
+    for (const [field, currentValue] of Object.entries(fields)) {
+      const key      = `${sceneId}.${field}`
+      const newValue = rowValues.get(key) ?? ""
+      if (newValue !== currentValue) {
+        updateField(sceneId, field, newValue)
+      }
+      if (newValue !== "") hasValue = true
+    }
+
+    if (hasValue) takeScene(sceneId)
+    else          outScene(sceneId)
   }
 }
 
@@ -127,7 +145,7 @@ function onPlayPage(pageId: string) {
 </script>
 
 <template>
-  <nav class="flex flex-wrap gap-6 px-2 py-3">
+  <nav class="overflow-x-auto items-start flex gap-6 px-2 py-3">
     <SceneGroupComponent
         v-for="group in groups"
         :key="group.label"
@@ -141,7 +159,7 @@ function onPlayPage(pageId: string) {
     />
   </nav>
 
-  <main class="flex gap-2 h-full p-2">
+  <main class="pb-40 max-w-400 mx-auto flex gap-2 h-full p-2">
     <!-- Rundown sidebar -->
     <aside class="rounded-lg border border-border w-64 shrink-0 bg-surface flex flex-col">
       <div class="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
@@ -193,9 +211,11 @@ function onPlayPage(pageId: string) {
           @reorder="onReorder"
           @rename-page="onRenamePage"
           @add-row="onAddRow"
+          @remove-row="onRemoveRow"
           @update-row="onUpdateRow"
           @reorder-rows="onReorderRows"
           @select-row="onSelectRow"
+          @take-row="onTakeRow"
           @capture-row="onCaptureRow"
           @play-page="onPlayPage"
       />

@@ -48,17 +48,12 @@ sealed class ServerEvent {
         val pages: List<Page>
     ) : ServerEvent()
 
-    /**
-     * Broadcast after a successful save or rename.
-     * Carries both old and new id so clients can reconcile their local state
-     * when the id changes (e.g. first-save of a new rundown).
-     */
     @Serializable
     @SerialName("RundownSaved")
     data class RundownSaved(
         val id: String,
         val name: String,
-        val previousId: String = id   // same as id unless a rename changed it
+        val pages: List<Page>
     ) : ServerEvent()
 
     @Serializable

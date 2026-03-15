@@ -33,6 +33,8 @@ object WebSocket {
                 frame as? Frame.Text ?: continue
                 val text = frame.readText()
 
+                println("event: " + json.decodeFromString<WebSocketEvent>(text))
+
                 when (val event = json.decodeFromString<WebSocketEvent>(text)) {
 
                     // ── Scene ──────────────────────────────────────────────────
@@ -68,6 +70,7 @@ object WebSocket {
 
                     is WebSocketEvent.LoadRundown -> {
                         val rundown = RundownStore.get(event.id)
+                        rundown?.pages?.forEach { println(it) }
                         if (rundown != null) {
                             session.sendEvent(
                                 ServerEvent.RundownData(rundown.id, rundown.name, rundown.pages)
@@ -79,12 +82,14 @@ object WebSocket {
 
                     is WebSocketEvent.SaveRundown -> {
                         val previousId = event.id.ifBlank { null }
+                        println("Saving $previousId")
                         val saved = RundownStore.save(event.id, event.name, event.pages)
+                        println(event)
                         broadcast(
                             ServerEvent.RundownSaved(
-                                id         = saved.id,
-                                name       = saved.name,
-                                previousId = previousId ?: saved.id
+                                id = saved.id,
+                                name = saved.name,
+                                pages = event.pages,
                             )
                         )
                     }

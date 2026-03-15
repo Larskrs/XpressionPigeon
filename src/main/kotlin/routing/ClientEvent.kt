@@ -53,7 +53,7 @@ sealed class WebSocketEvent {
     @Serializable
     @SerialName("SaveRundown")
     data class SaveRundown(
-        val id: String,       // blank = new rundown
+        val id: String,
         val name: String,
         val pages: List<Page>
     ) : WebSocketEvent()

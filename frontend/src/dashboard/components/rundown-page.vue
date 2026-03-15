@@ -11,7 +11,7 @@ const props = defineProps<{
   isOpen:        boolean
   isDragging:    boolean
   isDragOver:    boolean
-  isActivePage?: boolean   // true when this page is loaded in the player
+  isActivePage?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -20,8 +20,10 @@ const emit = defineEmits<{
   remove:      []
   addRow:      [row: Row]
   updateRow:   [row: Row]
+  removeRow:   [rowId: string]
   reorderRows: [rows: Row[]]
   selectRow:   [row: Row]
+  takeRow:     [row: Row]
   captureRow:  [row: Row]
   playPage:    []
   moveUp:      []
@@ -54,20 +56,13 @@ function commitRename() {
 // ── Delete confirmation ───────────────────────────────────────────────────────
 const confirming = ref(false)
 
-// ── Page drag — only initiated from the handle, not from row content ──────────
-// The root div is NOT draggable. Instead we set draggable on the handle itself
-// and forward the events up so the parent rundown.vue reorder logic still works.
+// ── Page drag — only initiated from the handle ────────────────────────────────
 function onHandleDragStart(e: DragEvent) {
   emit("dragstart", e)
 }
 </script>
 
 <template>
-  <!--
-    No draggable="true" here — dragging is initiated exclusively from the handle
-    below. We still need dragover/drop/dragend on the root so the parent can
-    use this element as a drop target for page reordering.
-  -->
   <div
       class="group transition-opacity"
       :class="{ 'opacity-30': isDragging }"
@@ -87,11 +82,7 @@ function onHandleDragStart(e: DragEvent) {
         :class="{ 'bg-emerald-950/40 border-l-2 border-emerald-500': isActivePage }"
     >
 
-      <!--
-        Drag handle — this is the only element that is draggable="true".
-        Using @mousedown to set draggable on the parent would leak; instead we
-        make the handle itself the draggable element and emit the event upward.
-      -->
+      <!-- Drag handle -->
       <span
           draggable="true"
           class="cursor-grab active:cursor-grabbing text-zinc-700 hover:text-zinc-400 px-1 py-1 transition-colors shrink-0"
@@ -203,14 +194,16 @@ function onHandleDragStart(e: DragEvent) {
       >Cancel</button>
     </div>
 
-    <!-- Expanded rows — all drag events are stopped inside RundownPageRows -->
+    <!-- Expanded rows -->
     <RundownPageRows
         v-if="isOpen"
-        :rows="page.rows"
+        :page="page"
         @add-row="emit('addRow', $event)"
         @update-row="emit('updateRow', $event)"
+        @remove-row="emit('removeRow', $event)"
         @reorder-rows="emit('reorderRows', $event)"
         @select-row="emit('selectRow', $event)"
+        @take-row="emit('takeRow', $event)"
         @capture-row="emit('captureRow', $event)"
     />
   </div>
