@@ -1,4 +1,3 @@
-// store.ts - fix setValues to handle flat map from server
 import { reactive } from "vue"
 
 export const store = reactive({
@@ -10,5 +9,5 @@ export const store = reactive({
 
     updateValue(key: string, value: string) {
         this.values[key] = value
-    }
+    },
 })

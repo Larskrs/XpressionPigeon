@@ -18,9 +18,9 @@
   --color-border-subtle: oklch(0.28 0.02 260);
   --color-border-focus: oklch(0.69 0.057 232.594);
 
-  --color-primary: oklch(0.70 0.18 250);
-  --color-primary-hover: oklch(0.78 0.20 250);
-  --color-primary-muted: oklch(0.21 0.06 250);
+  --color-primary: oklch(0.543 0.244 262);
+  --color-primary-hover: oklch(0.78 0.20 262);
+  --color-primary-muted: oklch(0.41 0.1 262);
 
   --color-success: oklch(0.72 0.18 145);
   --color-warning: oklch(0.82 0.18 80);
@@ -81,50 +81,3 @@ body, html {
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
-.sidebar-expanded {
-  grid-template-columns: 16rem 1fr;
-}
-
-/* Mobile: collapsed = top bar + content below */
-.sidebar-collapsed {
-  grid-template-columns: 1fr;
-  grid-template-rows: 3.5rem 1fr;
-}
-
-.sidebar-collapsed > nav {
-  grid-row: 1;
-  grid-column: 1;
-  height: 3.5rem;
-  width: 100%;
-  flex-direction: row;
-  justify-content: start;
-  position: relative;
-  z-index: 1000;
-}
-
-.sidebar-collapsed > main {
-  grid-row: 2;
-  grid-column: 1;
-}
-
-/* Desktop: collapsed = narrow sidebar beside content */
-@media (min-width: 720px) {
-  .sidebar-collapsed {
-    grid-template-columns: 3.5rem 1fr;
-    grid-template-rows: 1fr;
-  }
-
-  .sidebar-collapsed > nav {
-    grid-row: 1;
-    grid-column: 1;
-    height: 100%;
-    width: 3.5rem;
-    flex-direction: column;
-    justify-content: start;
-  }
-
-  .sidebar-collapsed > main {
-    grid-row: 1;
-    grid-column: 2;
-  }
-}

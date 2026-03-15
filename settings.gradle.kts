@@ -5,4 +5,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "XpressionPigeon"
-include("rosstalk-mock")
+//include("rosstalk-mock")
