@@ -1,6 +1,6 @@
 <!-- SceneInput.vue -->
 <script setup lang="ts">
-import { ref, watch } from "vue"
+import {computed, ref, watch} from "vue"
 
 const props = defineProps<{
   label: string
@@ -14,7 +14,9 @@ const emit = defineEmits<{
 }>()
 
 const localValue = ref(props.modelValue)
-const isFocused = ref(false)
+const isFocused  = ref(false)
+
+const isFloated = computed(() => isFocused.value || localValue.value !== "")
 
 watch(() => props.modelValue, (val) => {
   if (!isFocused.value) localValue.value = val
@@ -35,16 +37,22 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-1">
-    <label class="text-[10px] tracking-widest uppercase text-zinc-500">{{ label }}</label>
+  <div class="relative mt-0">
+    <!-- Floating label -->
+    <label
+        class="absolute left-3 transition-all tracking-widest duration-250 ease-in-out pointer-events-none z-10 origin-left"
+        :class="isFloated
+          ? 'top-0 -translate-y-1/2 text-zinc-500 text-xs bg-zinc-950 px-1.5'
+          : 'top-[0.6rem] translate-y-0 text-sm text-zinc-600 bg-transparent px-0'"
+    >{{ label }}</label>
+
     <textarea
         v-model="localValue"
-        :placeholder="placeholder ?? label"
         rows="1"
         @focus="isFocused = true"
         @blur="isFocused = false; commit()"
         @keydown="onKeydown"
-        class="w-full bg-zinc-800/60 text-zinc-100 text-sm rounded px-3 py-2 placeholder-zinc-600 resize-none leading-relaxed border border-zinc-700 hover:border-zinc-600 focus:border-zinc-500 focus:outline-none transition-colors"
+        class="w-full bg-zinc-950 text-zinc-100 text-[12px] rounded px-3 py-2 resize-none leading-relaxed border border-zinc-700 hover:border-zinc-600 focus:border-zinc-500 focus:outline-none transition-colors"
         style="field-sizing: content; min-height: 2.25rem;"
     />
   </div>

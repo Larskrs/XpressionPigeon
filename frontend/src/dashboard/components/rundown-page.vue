@@ -7,6 +7,8 @@ import { Icon } from "@iconify/vue";
 const props = defineProps<{
   page:          Page
   index:         number
+  color?:  string
+
   isLast:        boolean
   isOpen:        boolean
   isDragging:    boolean
@@ -17,6 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggle:      []
   rename:      [name: string]
+  recolor:     [color: string]
   remove:      []
   addRow:      [row: Row]
   updateRow:   [row: Row]
@@ -64,12 +67,26 @@ function onHandleDragStart(e: DragEvent) {
 
 <template>
   <div
-      class="group transition-opacity"
+      class="pl-2 group transition-opacity relative"
       :class="{ 'opacity-30': isDragging }"
       @dragover="emit('dragover', $event)"
       @drop="emit('drop', $event)"
       @dragend="emit('dragend')"
   >
+    <!-- Custom Color Picker -->
+    <div class="h-full absolute w-2 left-0 top-0 bottom-0 group/color cursor-pointer">
+      <div
+          class="h-full w-full"
+          :style="{ background: page?.color ?? '#222' }"
+      />
+      <input
+          type="color"
+          :value="page?.color ?? '#222222'"
+          class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          title="Change page color"
+          @input="emit('recolor', ($event.target as HTMLInputElement).value)"
+      />
+    </div>
     <!-- Drop indicator -->
     <div
         class="h-0.5 bg-blue-500 mx-5 transition-opacity duration-100"

@@ -23,6 +23,7 @@ export interface Page {
     id: string
     order: number
     name: string
+    color?: string
     rows: Row[]
 }
 
@@ -37,9 +38,15 @@ export interface RundownMeta {
     name: string
 }
 
+export interface RowReference {
+    pageId: string,
+    rowId: string
+}
+
 interface RundownState {
     index:   RundownMeta[]
     current: Rundown | null
+    editing: RowReference | null
     loading: boolean
     error:   string | null
 }
@@ -50,6 +57,7 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
     const state = reactive<RundownState>({
         index:   [],
         current: null,
+        editing: null,
         loading: false,
         error:   null,
     })
@@ -205,6 +213,10 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
         return [...rows].sort((a, b) => a.order - b.order)
     }
 
+    function selectEditing(pageId: string, rowId: string) {
+        state.editing = { pageId, rowId }
+    }
+
     return {
         state,
         listRundowns,
@@ -217,6 +229,7 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
         removePage,
         addRow,
         updateRow,
-        removeRow
+        removeRow,
+        selectEditing
     }
 }

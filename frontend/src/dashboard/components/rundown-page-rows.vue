@@ -105,6 +105,7 @@ function addNewRow() {
         @dragover="onDragOver($event, i)"
         @dragleave="onDragLeave($event)"
         @drop="onDrop($event, i)"
+        @click="emit('selectRow', row)"
     >
       <!-- Drop indicator line -->
       <div

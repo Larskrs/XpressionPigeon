@@ -1,26 +1,28 @@
 <script setup lang="ts">
 import { ref, nextTick } from "vue"
-import type { Rundown, Page, Row } from "../useRundown.ts"
+import type {Rundown, Page, Row, RowReference} from "../useRundown.ts"
 import RundownHeader from "./rundown-header.vue"
 import RundownPage   from "./rundown-page.vue"
 import { useReorder, DRAG_TYPE_PAGE } from "../useReorder.ts"
 
 const props = defineProps<{ rundown: Rundown; activePageId?: string | null }>()
 const emit = defineEmits<{
-  save:         []
-  rename:       [name: string]
-  addPage:      [page: Page]
-  removePage:   [pageId: string]
-  reorder:      [pages: Page[]]
-  renamePage:   [pageId: string, name: string]
-  addRow:       [pageId: string, row: Row]
-  updateRow:    [pageId: string, row: Row]
-  removeRow:    [pageId: string, rowId: string]
-  reorderRows:  [pageId: string, rows: Row[]]
-  selectRow:    [row: Row]
-  takeRow:      [row: Row]
-  captureRow:   [pageId: string, row: Row]
-  playPage:     [pageId: string]
+  save:             []
+  rename:           [name: string]
+  recolorPage:      [pageId: string, name: string]
+  addPage:          [page: Page]
+  removePage:       [pageId: string]
+  reorder:          [pages: Page[]]
+  renamePage:       [pageId: string, name: string]
+  addRow:           [pageId: string, row: Row]
+  updateRow:        [pageId: string, row: Row]
+  removeRow:        [pageId: string, rowId: string]
+  reorderRows:      [pageId: string, rows: Row[]]
+  selectRow:        [pageId: string, row: Row]
+  takeRow:          [row: Row]
+  captureRow:       [pageId: string, row: Row]
+  playPage:         [pageId: string]
+  selectEditing:    [rowReference: RowReference]
 }>()
 
 const openPages = ref<Record<string, boolean>>({})
@@ -80,6 +82,7 @@ function cancelAddPage() {
           :key="page.id"
           :page="page"
           :index="index"
+          color="red"
           :is-last="index === rundown.pages.length - 1"
           :is-open="!!openPages[page.id]"
           :is-dragging="draggingId === page.id"
@@ -87,6 +90,7 @@ function cancelAddPage() {
           :is-active-page="activePageId === page.id"
           @toggle="openPages[page.id] = !openPages[page.id]"
           @rename="emit('renamePage', page.id, $event)"
+          @recolor="emit('recolorPage', page.id, $event)"
           @remove="emit('removePage', page.id)"
           @move-up="moveUp(index)"
           @move-down="moveDown(index)"
@@ -98,7 +102,7 @@ function cancelAddPage() {
           @update-row="emit('updateRow', page.id, $event)"
           @remove-row="emit('removeRow', page.id, $event)"
           @reorder-rows="emit('reorderRows', page.id, $event)"
-          @select-row="emit('selectRow', $event)"
+          @select-row="emit('selectRow', page.id, $event)"
           @take-row="emit('takeRow', $event)"
           @capture-row="emit('captureRow', page.id, $event)"
           @play-page="emit('playPage', page.id)"

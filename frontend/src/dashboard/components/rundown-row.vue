@@ -62,6 +62,21 @@ function cancelEdit() {
   editingField.value = null
 }
 
+function parseTimeInput(input: string): number {
+  const t = input.trim()
+  if (!t) return 0
+
+  // Plain integer — treat as seconds
+  if (/^\d+$/.test(t)) return Math.max(0, parseInt(t, 10))
+
+  const parts = t.split(":").map(p => parseInt(p, 10) || 0)
+
+  if (parts.length === 3) return parts[0]! * 3600 + parts[1]! * 60 + parts[2]!
+  if (parts.length === 2) return parts[0]! * 60  + parts[1]!
+
+  return 0
+}
+
 function formatSeconds(total: number): string {
   if (!total && total !== 0) return "0:00"
   const h = Math.floor(total / 3600)
@@ -69,17 +84,6 @@ function formatSeconds(total: number): string {
   const s = total % 60
   const pad = (n: number) => String(n).padStart(2, "0")
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
-}
-
-function parseTimeInput(input: string): number {
-  const t = input.trim()
-  if (!t) return 0
-  if (/^\d+$/.test(t)) return Math.max(0, parseInt(t, 10))
-  const parts = t.split(":").map(p => parseInt(p, 10) || 0)
-  if (!parts[0] || !parts[1] || !parts[2]) return 0
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
-  if (parts.length === 2) return parts[0] * 60 + parts[1]
-  return 0
 }
 
 function onDragStart(e: DragEvent) {
@@ -104,6 +108,7 @@ const isUntitled      = computed(() => !props.row.name?.trim())
       draggable="true"
       @dragstart="onDragStart"
       @dragend="onDragEnd"
+      @click.stop="emit('select', row)"
   >
     <Icon icon="material-symbols:drag-indicator" class="size-4" />
   </div>

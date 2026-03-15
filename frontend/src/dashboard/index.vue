@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from "vue"
+import {computed, onBeforeUnmount, onMounted} from "vue"
 import { createSocket } from "./socket.ts"
 import { useSocket } from "./useSocket.ts"
 import { groups, useScenes } from "./useScenes.ts"
@@ -8,6 +8,7 @@ import { usePagePlayer } from "./usePagePlayer.ts"
 import SceneGroupComponent from "./components/scene-group.vue"
 import RundownComponent from "./components/rundown.vue"
 import PagePlayerBar from "./components/page-player-bar.vue"
+import RundownRowEditor from "@/dashboard/components/rundown-row-editor.vue";
 
 const socket = createSocket()
 useSocket(socket)
@@ -21,7 +22,15 @@ onBeforeUnmount(() => {
   socket.disconnect()
 })
 
-const { scenes, sceneStates, takeScene, outScene, updateField, handleFlip } = useScenes(socket)
+// add after useRundown(...)
+const editingRow = computed(() => {
+  const e = rundownState.editing
+  if (!e) return null
+  const page = rundownState.current?.pages.find(p => p.id === e.pageId)
+  return page?.rows.find(r => r.id === e.rowId) ?? null
+})
+
+const { scenes, sceneStates, takeScene, outScene, updateField, handleFlip, ungroupedSceneIds } = useScenes(socket)
 const {
   state: rundownState,
   listRundowns,
@@ -33,7 +42,8 @@ const {
   removePage,
   addRow,
   updateRow,
-  removeRow
+  removeRow,
+  selectEditing,
 } = useRundown(socket)
 
 // ── Page player ───────────────────────────────────────────────────────────────
@@ -90,16 +100,18 @@ function onReorderRows(pageId: string, rows: Row[]) {
   saveRundown()
 }
 
-function onSelectRow(row: Row) {
-  const rowValues = new Map(row.values.map(p => [p.name, p.value]))
-  for (const [sceneId, fields] of Object.entries(scenes.value)) {
-    for (const [field, currentValue] of Object.entries(fields)) {
-      const key = `${sceneId}.${field}`
-      const newValue = rowValues.get(key) ?? ""
-      if (newValue === currentValue) continue
-      updateField(sceneId, field, newValue)
-    }
-  }
+function onSelectRow(pageId: string, row: Row) {
+//  const rowValues = new Map(row.values.map(p => [p.name, p.value]))
+//  for (const [sceneId, fields] of Object.entries(scenes.value)) {
+//    for (const [field, currentValue] of Object.entries(fields)) {
+//      const key = `${sceneId}.${field}`
+//      const newValue = rowValues.get(key) ?? ""
+//      if (newValue === currentValue) continue
+//      updateField(sceneId, field, newValue)
+//    }
+//  }
+
+  selectEditing(pageId, row.id)
 }
 
 function onTakeRow(row: Row) {
@@ -142,24 +154,51 @@ function onPlayPage(pageId: string) {
   player.loadPage(page)
   player.play()
 }
+
+
+function onSaveEditedRow(updated: Row) {
+  if (!rundownState.editing) return
+  updateRow(rundownState.editing.pageId, updated)
+  saveRundown()
+  rundownState.editing = null
+}
+
+function onRecolorPage(pageId: string, color: string) {
+  const page = rundownState.current?.pages.find(p => p.id === pageId)
+  if (!page) return
+  page.color = color
+  saveRundown()
+}
+
 </script>
 
 <template>
-  <nav class="overflow-x-auto items-start flex gap-6 px-2 py-3">
-    <SceneGroupComponent
-        v-for="group in groups"
-        :key="group.label"
-        :group="group"
-        :scenes="scenes"
-        :scene-states="sceneStates"
-        @take="takeScene"
-        @out="outScene"
-        @update="updateField"
-        @flip="handleFlip"
-    />
-  </nav>
+  <div class="flex-col h-full min-h-[100dvh]">
+    <nav class="row-span-3 overflow-x-auto items-start flex gap-6 px-2 py-3">
+      <SceneGroupComponent
+          v-for="group in groups"
+          :key="group.label"
+          :group="group"
+          :scenes="scenes"
+          :scene-states="sceneStates"
+          @take="takeScene"
+          @out="outScene"
+          @update="updateField"
+          @flip="handleFlip"
+      />
 
-  <main class="pb-40 max-w-400 mx-auto flex gap-2 h-full p-2">
+      <SceneGroupComponent
+          v-if="ungroupedSceneIds.length > 0"
+          :group="{ label: 'Other', sceneIds: ungroupedSceneIds }"
+          :scenes="scenes"
+          :scene-states="sceneStates"
+          @take="takeScene"
+          @out="outScene"
+          @update="updateField"
+          @flip="handleFlip"
+      />
+    </nav>
+    <main class="w-full mx-auto flex gap-2 h-full p-2 overflow-hidden">
     <!-- Rundown sidebar -->
     <aside class="rounded-lg border border-border w-64 shrink-0 bg-transparent flex flex-col">
       <div class="flex items-center justify-between rounded-t-lg n px-4 py-3 border-b bg-zinc-900 border-zinc-800">
@@ -209,6 +248,7 @@ function onPlayPage(pageId: string) {
           @remove-page="onRemovePage"
           @reorder="onReorder"
           @rename-page="onRenamePage"
+          @recolor-page="onRecolorPage"
           @add-row="onAddRow"
           @remove-row="onRemoveRow"
           @update-row="onUpdateRow"
@@ -223,8 +263,16 @@ function onPlayPage(pageId: string) {
         Select a rundown to get started
       </div>
     </section>
-  </main>
 
+    <RundownRowEditor
+        v-if="editingRow"
+        :row="editingRow"
+        :scenes="scenes"
+        @save="onSaveEditedRow"
+        @cancel="rundownState.editing = null"
+    />
+  </main>
+  </div>
   <!-- Player transport bar — rendered via Teleport to body, shown when a page is loaded -->
   <PagePlayerBar v-if="player.page.value" :player="player" />
 </template>
