@@ -161,8 +161,8 @@ function onPlayPage(pageId: string) {
 
   <main class="pb-40 max-w-400 mx-auto flex gap-2 h-full p-2">
     <!-- Rundown sidebar -->
-    <aside class="rounded-lg border border-border w-64 shrink-0 bg-surface flex flex-col">
-      <div class="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+    <aside class="rounded-lg border border-border w-64 shrink-0 bg-transparent flex flex-col">
+      <div class="flex items-center justify-between rounded-t-lg n px-4 py-3 border-b bg-zinc-900 border-zinc-800">
         <span class="text-sm font-medium text-zinc-300">Rundowns</span>
         <button
             class="text-xs text-zinc-400 hover:text-white transition-colors"
@@ -177,11 +177,10 @@ function onPlayPage(pageId: string) {
             v-for="meta in rundownState.index"
             :key="meta.id"
             class="flex items-center rounded gap-2 px-4 py-2 cursor-pointer transition-colors"
-            :class="{ 'bg-surface-elevated': rundownState.current?.id === meta.id }"
+            :class="{ 'bg-zinc-800 text-zinc-800': rundownState.current?.id === meta.id }"
             @click="loadRundown(meta.id)"
         >
           <span class="flex-1 truncate text-sm text-zinc-300">{{ meta.name }}</span>
-          <span class="flex-1 truncate text-sm text-zinc-300">{{ meta.id }}</span>
         </li>
 
         <li v-if="rundownState.index.length === 0" class="px-4 py-3 text-xs text-zinc-600">
