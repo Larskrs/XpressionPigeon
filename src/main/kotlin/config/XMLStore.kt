@@ -3,6 +3,7 @@ package com.example.routing
 
 import config.AppConfig
 import com.example.config.AppPaths
+import data.RundownStore
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.OutputKeys
@@ -14,6 +15,8 @@ import kotlinx.coroutines.*
 object XmlDataStore {
     private val data = mutableMapOf<String, String>()
     private lateinit var xmlFile: File
+
+    @Volatile var activeRundownId: String? = null
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var writeJob: Job? = null
@@ -97,11 +100,13 @@ object XmlDataStore {
         doc.appendChild(root)
 
         // Snapshot the map to avoid holding any lock during IO
-        val snapshot = synchronized(data) { data.toMap() }
+        val snapshot   = synchronized(data) { data.toMap() }
+        val rundownId  = activeRundownId
 
         snapshot.forEach { (key, value) ->
-            val element = doc.createElement(key)
-            element.textContent = value
+            val resolved = if (rundownId != null) RundownStore.resolvePlaceholders(rundownId, value) else value
+            val element  = doc.createElement(key)
+            element.textContent = resolved
             root.appendChild(element)
         }
 

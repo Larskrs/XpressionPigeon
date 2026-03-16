@@ -9,6 +9,7 @@ const props = defineProps<{ rundown: Rundown; activePageId?: string | null }>()
 const emit = defineEmits<{
   save:             []
   rename:           [name: string]
+  editPlaceholders: []
   recolorPage:      [pageId: string, name: string]
   addPage:          [page: Page]
   removePage:       [pageId: string]
@@ -68,6 +69,7 @@ function cancelAddPage() {
         :page-count="rundown.pages.length"
         @save="emit('save')"
         @rename="(name: string) => emit('rename', name)"
+        @edit-placeholders="emit('editPlaceholders')"
     />
 
     <div class="flex-1 overflow-y-auto divide-y divide-zinc-800/60">

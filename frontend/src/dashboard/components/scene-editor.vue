@@ -2,11 +2,13 @@
 <script setup lang="ts">
 import SceneInput from "./scene-input.vue"
 import { Icon} from "@iconify/vue";
+import type { Placeholder } from "../useRundown.ts"
 
 const props = defineProps<{
   sceneId: string
   fields: Record<string, string>
   isOn: boolean
+  placeholders?: Placeholder[]
 }>()
 
 const emit = defineEmits<{
@@ -26,7 +28,7 @@ function clearValues() {
 </script>
 
 <template>
-  <div :class="['rounded-lg overflow-hidden min-w-60 border transition-colors',
+  <div :class="['rounded-lg min-w-60 border transition-colors',
     isOn ? 'border-blue-500 bg-blue-800/5' : 'border-zinc-700']">
 
     <!-- Header -->
@@ -47,6 +49,7 @@ function clearValues() {
           :key="field"
           :label="String(field)"
           :model-value="value"
+          :placeholders="placeholders"
           @commit="(val: any) => emit('update', sceneId, String(field), val)"
       />
     </div>

@@ -1,6 +1,7 @@
 package routing
 
 import data.Page
+import data.Placeholder
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -55,7 +56,8 @@ sealed class WebSocketEvent {
     data class SaveRundown(
         val id: String,
         val name: String,
-        val pages: List<Page>
+        val pages: List<Page>,
+        val placeholders: List<Placeholder>
     ) : WebSocketEvent()
 
     /**
@@ -77,4 +79,26 @@ sealed class WebSocketEvent {
     @Serializable
     @SerialName("FlushRundowns")
     object FlushRundowns : WebSocketEvent()
+
+
+    @Serializable
+    @SerialName("SetPlaceholder")
+    data class SetPlaceholder(
+        val rundownId: String,
+        val key: String,
+        val value: String,
+    ) : WebSocketEvent()
+
+    @Serializable
+    @SerialName("DeletePlaceholder")
+    data class DeletePlaceholder(
+        val rundownId: String,
+        val key: String,
+    ) : WebSocketEvent()
+
+    @Serializable
+    @SerialName("GetPlaceholders")
+    data class GetPlaceholders(
+        val rundownId: String,
+    ) : WebSocketEvent()
 }

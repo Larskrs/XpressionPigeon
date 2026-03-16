@@ -13,7 +13,14 @@ import java.util.concurrent.ConcurrentHashMap
 data class Rundown(
     val id: String,
     val name: String,
-    val pages: List<Page>
+    val pages: List<Page>,
+    val placeholders: List<Placeholder> = emptyList(),
+)
+
+@Serializable
+data class Placeholder(
+    val key: String,
+    val value: String,
 )
 
 @Serializable
@@ -22,7 +29,7 @@ data class Page(
     val color: String? = null,
     val order: Int,
     val name: String,
-    val rows: List<Row>
+    val rows: List<Row>,
 )
 
 @Serializable
@@ -82,9 +89,9 @@ object RundownStore {
      * If [id] is blank a new UUID is assigned here — the caller receives the
      * real id back via the returned [Rundown] and must use it from that point on.
      */
-    fun save(id: String, name: String, pages: List<Page>): Rundown {
+    fun save(id: String, name: String, pages: List<Page>, placeholders: List<Placeholder>): Rundown {
         val resolvedId = id.ifBlank { UUID.randomUUID().toString() }
-        val rundown    = Rundown(id = resolvedId, name = name, pages = pages)
+        val rundown    = Rundown(id = resolvedId, name = name, pages = pages, placeholders)
         rundowns[resolvedId] = rundown
         markDirty(resolvedId)
         return rundown
@@ -152,5 +159,45 @@ object RundownStore {
     private fun fileFor(id: String): File {
         val safe = id.replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
         return File(rundownsDir, "$safe.json")
+    }
+
+    fun getPlaceholders(id: String): List<Placeholder>? =
+        rundowns[id]?.placeholders
+
+    fun setPlaceholders(id: String, placeholders: List<Placeholder>): Rundown? {
+        val existing = rundowns[id] ?: return null
+        val updated  = existing.copy(placeholders = placeholders)
+        rundowns[id] = updated
+        markDirty(id)
+        return updated
+    }
+
+    fun setPlaceholder(id: String, key: String, value: String): Rundown? {
+        val existing = rundowns[id] ?: return null
+        val merged = existing.placeholders
+            .filter { it.key != key } + Placeholder(key, value)
+        val updated = existing.copy(placeholders = merged)
+        rundowns[id] = updated
+        markDirty(id)
+        return updated
+    }
+
+    fun deletePlaceholder(id: String, key: String): Rundown? {
+        val existing = rundowns[id] ?: return null
+        val updated  = existing.copy(placeholders = existing.placeholders.filter { it.key != key })
+        rundowns[id] = updated
+        markDirty(id)
+        return updated
+    }
+
+    /**
+     * Replaces all %key% tokens in [text] using the placeholders
+     * stored for the given rundown. Unknown tokens are left as-is.
+     */
+    fun resolvePlaceholders(rundownId: String, text: String): String {
+        val placeholders = rundowns[rundownId]?.placeholders ?: return text
+        return placeholders.fold(text) { acc, ph ->
+            acc.replace("%${ph.key}%", ph.value)
+        }
     }
 }

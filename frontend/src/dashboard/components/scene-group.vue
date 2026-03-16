@@ -4,11 +4,13 @@ import { computed } from "vue"
 import { Icon } from "@iconify/vue"
 import SceneEditor from "@/dashboard/components/scene-editor.vue"
 import type { SceneGroup } from "../useScenes.ts"
+import type { Placeholder } from "../useRundown.ts"
 
 const props = defineProps<{
   group:       SceneGroup
   scenes:      Record<string, Record<string, string>>
   sceneStates: Record<string, boolean>
+  placeholders?: Placeholder[]
 }>()
 
 const emit = defineEmits<{
@@ -82,6 +84,7 @@ function clearAllValues() {
           :scene-id="sceneId"
           :fields="groupScenes[sceneId]"
           :is-on="sceneStates[sceneId] ?? false"
+          :placeholders="placeholders"
           @take="emit('take', $event)"
           @out="emit('out', $event)"
           @update="(sceneId: string, key: string, val: string) => emit('update', sceneId, key, val)"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, onBeforeUnmount, onMounted} from "vue"
+import {computed, onBeforeUnmount, onMounted, ref} from "vue"
 import { createSocket } from "./socket.ts"
 import { useSocket } from "./useSocket.ts"
 import { groups, useScenes } from "./useScenes.ts"
@@ -9,6 +9,7 @@ import SceneGroupComponent from "./components/scene-group.vue"
 import RundownComponent from "./components/rundown.vue"
 import PagePlayerBar from "./components/page-player-bar.vue"
 import RundownRowEditor from "@/dashboard/components/rundown-row-editor.vue";
+import PlaceholderModal from "@/components/PlaceholderModal.vue";
 
 const socket = createSocket()
 useSocket(socket)
@@ -44,11 +45,15 @@ const {
   updateRow,
   removeRow,
   selectEditing,
+  setPlaceholder,
+  deletePlaceholder,
 } = useRundown(socket)
 
 // ── Page player ───────────────────────────────────────────────────────────────
 
 const player = usePagePlayer({ scenes, updateField, takeScene, outScene })
+
+const placeholderModal = ref<InstanceType<typeof PlaceholderModal>>()
 
 // ── Stable event handlers ─────────────────────────────────────────────────────
 
@@ -181,6 +186,7 @@ function onRecolorPage(pageId: string, color: string) {
           :group="group"
           :scenes="scenes"
           :scene-states="sceneStates"
+          :placeholders="rundownState.current?.placeholders ?? []"
           @take="takeScene"
           @out="outScene"
           @update="updateField"
@@ -192,6 +198,7 @@ function onRecolorPage(pageId: string, color: string) {
           :group="{ label: 'Other', sceneIds: ungroupedSceneIds }"
           :scenes="scenes"
           :scene-states="sceneStates"
+          :placeholders="rundownState.current?.placeholders ?? []"
           @take="takeScene"
           @out="outScene"
           @update="updateField"
@@ -230,6 +237,7 @@ function onRecolorPage(pageId: string, color: string) {
 
     <!-- Rundown content -->
     <section class="rounded-lg border border-border flex-1 overflow-y-auto">
+
       <div v-if="rundownState.loading && rundownState.current === null" class="flex items-center justify-center h-32 text-sm">
         Loading…
       </div>
@@ -244,6 +252,7 @@ function onRecolorPage(pageId: string, color: string) {
           :active-page-id="player.page.value?.id ?? null"
           @save="saveRundown"
           @rename="onRename"
+          @edit-placeholders="placeholderModal?.open()"
           @add-page="onAddPage"
           @remove-page="onRemovePage"
           @reorder="onReorder"
@@ -273,6 +282,13 @@ function onRecolorPage(pageId: string, color: string) {
     />
   </main>
   </div>
+  <PlaceholderModal
+      ref="placeholderModal"
+      :placeholders="rundownState.current?.placeholders ?? []"
+      @set="setPlaceholder"
+      @delete="deletePlaceholder"
+  />
+
   <!-- Player transport bar — rendered via Teleport to body, shown when a page is loaded -->
   <PagePlayerBar v-if="player.page.value" :player="player" />
 </template>

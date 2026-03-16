@@ -9,6 +9,11 @@ export interface Parameter {
     value: string
 }
 
+export interface Placeholder {
+    key: string
+    value: string
+}
+
 export interface Row {
     id: string
     order: number
@@ -31,6 +36,7 @@ export interface Rundown {
     id: string
     name: string
     pages: Page[]
+    placeholders: Placeholder[]
 }
 
 export interface RundownMeta {
@@ -75,7 +81,7 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
 
             case "RundownData": {
                 const e = event as any
-                state.current = { id: e.id, name: e.name, pages: e.pages }
+                state.current = { id: e.id, name: e.name, pages: e.pages, placeholders: e.placeholders ?? [] }
                 state.loading = false
                 break
             }
@@ -119,6 +125,14 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
                 state.loading = false
                 break
             }
+
+            case "PlaceholdersUpdated": {
+                const e = event as any
+                if (state.current === null) break
+                if (state.current?.id !== e.rundownId) break
+                state.current.placeholders = e.placeholders
+                break
+            }
         }
     })
 
@@ -140,15 +154,20 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
         if (!rundown) return
         state.loading = true
         state.error   = null
-        console.log(rundown)
-        socket.send({ type: "SaveRundown", id: rundown.id, name: rundown.name, pages: rundown.pages })
+        socket.send({
+            type: "SaveRundown",
+            id: rundown.id,
+            name: rundown.name,
+            pages: rundown.pages,
+            placeholders: rundown.placeholders,
+        })
     }
 
     function createRundown(name: string, pages: Page[] = []) {
-        state.current = { id: "", name, pages }
+        state.current = { id: "", name, pages, placeholders: [] }
         state.loading = true
         state.error   = null
-        socket.send({ type: "SaveRundown", id: "", name, pages })
+        socket.send({ type: "SaveRundown", id: "", name, pages, placeholders: [] })
     }
 
     function renameRundown(id: string, name: string) {
@@ -157,6 +176,46 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
 
     function deleteRundown(id: string) {
         socket.send({ type: "DeleteRundown", id })
+    }
+
+    function setPlaceholder(key: string, value: string) {
+        const id = state.current?.id
+        if (!id) return
+        // Optimistic local update
+        if (state.current) {
+            const placeholders = state.current.placeholders.filter(p => p.key !== key)
+            state.current.placeholders = [...placeholders, { key, value }]
+        }
+        socket.send({ type: "SetPlaceholder", rundownId: id, key, value })
+    }
+
+    function deletePlaceholder(key: string) {
+        const id = state.current?.id
+        if (!id) return
+        // Optimistic local update
+        if (state.current) {
+            state.current.placeholders = state.current.placeholders.filter(p => p.key !== key)
+        }
+        socket.send({ type: "DeletePlaceholder", rundownId: id, key })
+    }
+
+    function getPlaceholders() {
+        const id = state.current?.id
+        if (!id) return
+        socket.send({ type: "GetPlaceholders", rundownId: id })
+    }
+
+    /**
+     * Resolves all %key% tokens in a string using the current rundown's
+     * placeholders. Unrecognised tokens are left as-is, matching server behaviour.
+     * Use this for preview/display — the server always resolves before applying.
+     */
+    function resolvePlaceholders(text: string): string {
+        if (!state.current) return text
+        return state.current.placeholders.reduce(
+            (acc, { key, value }) => acc.replace(`%${key}%`, value),
+            text
+        )
     }
 
     // ── Local mutation helpers ────────────────────────────────────────────────
@@ -230,6 +289,10 @@ export function useRundown(socket: WebSocketManager<ServerEvent>) {
         addRow,
         updateRow,
         removeRow,
-        selectEditing
+        selectEditing,
+        setPlaceholder,
+        deletePlaceholder,
+        getPlaceholders,
+        resolvePlaceholders,
     }
 }

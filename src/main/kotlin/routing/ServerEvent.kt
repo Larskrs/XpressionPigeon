@@ -2,6 +2,7 @@ package routing
 
 import com.example.routing.RossTalkStatus
 import data.Page
+import data.Placeholder
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -45,7 +46,8 @@ sealed class ServerEvent {
     data class RundownData(
         val id: String,
         val name: String,
-        val pages: List<Page>
+        val pages: List<Page>,
+        val placeholders: List<Placeholder>
     ) : ServerEvent()
 
     @Serializable
@@ -82,4 +84,14 @@ sealed class ServerEvent {
     @Serializable
     @SerialName("RossTalkStatus")
     data class RossTalkStatusChange(val status: RossTalkStatus) : ServerEvent()
+
+
+
+
+    @Serializable
+    @SerialName("PlaceholdersUpdated")
+    data class PlaceholdersUpdated(
+        val rundownId: String,
+        val placeholders: List<Placeholder>,
+    ) : ServerEvent()
 }

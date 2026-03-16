@@ -72,8 +72,9 @@ object WebSocket {
                         val rundown = RundownStore.get(event.id)
                         rundown?.pages?.forEach { println(it) }
                         if (rundown != null) {
+                            XmlDataStore.activeRundownId = rundown.id
                             session.sendEvent(
-                                ServerEvent.RundownData(rundown.id, rundown.name, rundown.pages)
+                                ServerEvent.RundownData(rundown.id, rundown.name, rundown.pages, rundown.placeholders)
                             )
                         } else {
                             session.sendEvent(ServerEvent.RundownNotFound(event.id))
@@ -83,7 +84,7 @@ object WebSocket {
                     is WebSocketEvent.SaveRundown -> {
                         val previousId = event.id.ifBlank { null }
                         println("Saving $previousId")
-                        val saved = RundownStore.save(event.id, event.name, event.pages)
+                        val saved = RundownStore.save(event.id, event.name, event.pages, event.placeholders)
                         println(event)
                         broadcast(
                             ServerEvent.RundownSaved(
@@ -111,6 +112,41 @@ object WebSocket {
                     is WebSocketEvent.FlushRundowns -> {
                         RundownStore.flushAll()
                         session.sendEvent(ServerEvent.RundownsFlushed)
+                    }
+
+
+                    is WebSocketEvent.GetPlaceholders -> {
+                        val placeholders = RundownStore.getPlaceholders(event.rundownId)
+                        if (placeholders != null) {
+                            session.sendEvent(
+                                ServerEvent.PlaceholdersUpdated(event.rundownId, placeholders)
+                            )
+                        } else {
+                            session.sendEvent(ServerEvent.RundownNotFound(event.rundownId))
+                        }
+                    }
+
+                    is WebSocketEvent.SetPlaceholder -> {
+                        val updated = RundownStore.setPlaceholder(event.rundownId, event.key, event.value)
+                        if (updated != null) {
+                            broadcast(
+                                ServerEvent.PlaceholdersUpdated(event.rundownId, updated.placeholders)
+                            )
+
+                        } else {
+                            session.sendEvent(ServerEvent.RundownNotFound(event.rundownId))
+                        }
+                    }
+
+                    is WebSocketEvent.DeletePlaceholder -> {
+                        val updated = RundownStore.deletePlaceholder(event.rundownId, event.key)
+                        if (updated != null) {
+                            broadcast(
+                                ServerEvent.PlaceholdersUpdated(event.rundownId, updated.placeholders)
+                            )
+                        } else {
+                            session.sendEvent(ServerEvent.RundownNotFound(event.rundownId))
+                        }
                     }
                 }
             }

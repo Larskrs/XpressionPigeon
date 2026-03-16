@@ -2,7 +2,7 @@
 import { ref } from "vue"
 
 const props = defineProps<{ name: string; pageCount: number }>()
-const emit  = defineEmits<{ save: []; rename: [name: string] }>()
+const emit  = defineEmits<{ save: []; rename: [name: string]; editPlaceholders: [] }>()
 
 const editing   = ref(false)
 const nameInput = ref(props.name)
@@ -35,6 +35,11 @@ function commit() {
     </template>
 
     <span class="text-xs text-zinc-600 tabular-nums shrink-0">{{ pageCount }}p</span>
+
+    <button
+        class="text-xs px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border border-zinc-700 hover:border-zinc-600 transition-colors shrink-0"
+        @click="emit('editPlaceholders')"
+    >Edit placeholders</button>
 
     <button
         class="text-xs px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white transition-colors shrink-0"
