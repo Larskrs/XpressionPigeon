@@ -106,6 +106,27 @@ export function usePagePlayer(api: PlayerSceneApi) {
         }
         activeRow.value = null
     }
+    function takeAll() {
+        for (const sceneId of getFilledScenes()) {
+           api.takeScene(sceneId)
+        }
+        activeRow.value = null
+    }
+
+    function getFilledScenes() {
+        let scenes: string[] = [];
+        for (const [sceneId, parameters] of Object.entries(api.scenes.value)) {
+            let params: any[] = []
+            for (const p of Object.values(parameters)) {
+                if (!p) continue
+                params = [...params, p]
+            }
+            if (params.length <= 0) continue
+            console.log()
+            scenes = [...scenes, sceneId]
+        }
+        return scenes
+    }
 
     /**
      * Clear every field to "" and out every scene.
@@ -263,7 +284,11 @@ export function usePagePlayer(api: PlayerSceneApi) {
     function onKeyDown(e: KeyboardEvent) {
         if (isInputFocused()) return
 
-        if (e.code === 'Space') {
+        if (e.code === "PageDown") {
+            outAll()
+        } else if (e.code === "PageUp") {
+            takeAll()
+        } else if (e.code === 'Space') {
             e.preventDefault()
             togglePlay()
         } else if (e.code === "ArrowDown") {
