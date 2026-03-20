@@ -57,6 +57,31 @@ const placeholderModal = ref<InstanceType<typeof PlaceholderModal>>()
 
 // ── Stable event handlers ─────────────────────────────────────────────────────
 
+function outAll() {
+  for (const [sceneId] of Object.entries(scenes.value)) {
+    outScene(sceneId)
+  }
+}
+function onTakeEditedRow(row: Row) {
+  const rowValues = new Map(row.values.map(p => [p.name, p.value]))
+
+  for (const [sceneId, fields] of Object.entries(scenes.value)) {
+    let hasValue = false
+
+    for (const [field, currentValue] of Object.entries(fields)) {
+      const key      = `${sceneId}.${field}`
+      const newValue = rowValues.get(key) ?? ""
+      if (newValue !== currentValue) {
+        updateField(sceneId, field, newValue)
+      }
+      if (newValue !== "") hasValue = true
+    }
+
+    if (hasValue) takeScene(sceneId)
+    else          outScene(sceneId)
+  }
+}
+
 function onRename(name: string) {
   if (!rundownState.current) return
   renameRundown(rundownState.current.id, name)
@@ -178,110 +203,117 @@ function onRecolorPage(pageId: string, color: string) {
 </script>
 
 <template>
-  <div class="flex-col h-full min-h-[100dvh]">
-    <nav class="row-span-3 overflow-x-auto items-start flex gap-6 px-2 py-3">
-      <SceneGroupComponent
-          v-for="group in groups"
-          :key="group.label"
-          :group="group"
-          :scenes="scenes"
-          :scene-states="sceneStates"
-          :placeholders="rundownState.current?.placeholders ?? []"
-          @take="takeScene"
-          @out="outScene"
-          @update="updateField"
-          @flip="handleFlip"
-      />
+  <div class="fixed inset-0 overflow-auto">
+    <div class="flex-col h-full min-h-[100dvh]">
+      <nav class="row-span-3 overflow-x-auto items-start flex gap-6 px-2 py-3">
+        <SceneGroupComponent
+            v-for="group in groups"
+            :key="group.label"
+            :group="group"
+            :scenes="scenes"
+            :scene-states="sceneStates"
+            :placeholders="rundownState.current?.placeholders ?? []"
+            @take="takeScene"
+            @out="outScene"
+            @update="updateField"
+            @flip="handleFlip"
+        />
 
-      <SceneGroupComponent
-          v-if="ungroupedSceneIds.length > 0"
-          :group="{ label: 'Other', sceneIds: ungroupedSceneIds }"
-          :scenes="scenes"
-          :scene-states="sceneStates"
-          :placeholders="rundownState.current?.placeholders ?? []"
-          @take="takeScene"
-          @out="outScene"
-          @update="updateField"
-          @flip="handleFlip"
-      />
-    </nav>
-    <main class="w-full mx-auto flex gap-2 h-full p-2 overflow-hidden">
-    <!-- Rundown sidebar -->
-    <aside class="rounded-lg border border-border w-64 shrink-0 bg-transparent flex flex-col">
-      <div class="flex items-center justify-between rounded-t-lg n px-4 py-3 border-b bg-zinc-900 border-zinc-800">
-        <span class="text-sm font-medium text-zinc-300">Rundowns</span>
-        <button
-            class="text-xs text-zinc-400 hover:text-white transition-colors"
-            @click="createRundown('New Rundown')"
-        >
-          + New
-        </button>
-      </div>
+        <SceneGroupComponent
+            v-if="ungroupedSceneIds.length > 0"
+            :group="{ label: 'Other', sceneIds: ungroupedSceneIds }"
+            :scenes="scenes"
+            :scene-states="sceneStates"
+            :placeholders="rundownState.current?.placeholders ?? []"
+            @take="takeScene"
+            @out="outScene"
+            @update="updateField"
+            @flip="handleFlip"
+        />
+      </nav>
 
-      <ul class="flex-1 overflow-y-auto p-1">
-        <li
-            v-for="meta in rundownState.index"
-            :key="meta.id"
-            class="flex items-center rounded gap-2 px-4 py-2 cursor-pointer transition-colors"
-            :class="{ 'bg-zinc-800 text-zinc-800': rundownState.current?.id === meta.id }"
-            @click="loadRundown(meta.id)"
-        >
-          <span class="flex-1 truncate text-sm text-zinc-300">{{ meta.name }}</span>
-        </li>
+      <main class="w-full mx-auto flex gap-2 h-full p-2">
+        <!-- Rundown sidebar -->
+        <aside class="rounded-lg border border-border w-64 shrink-0 bg-transparent flex flex-col">
+          <div class="flex items-center justify-between rounded-t-lg px-4 py-3 border-b bg-zinc-900 border-zinc-800">
+            <span class="text-sm font-medium text-zinc-300">Rundowns</span>
+            <button
+                class="text-xs text-zinc-400 hover:text-white transition-colors"
+                @click="createRundown('New Rundown')"
+            >
+              + New
+            </button>
+          </div>
 
-        <li v-if="rundownState.index.length === 0" class="px-4 py-3 text-xs text-zinc-600">
-          No rundowns yet
-        </li>
-      </ul>
-    </aside>
+          <ul class="flex-1 overflow-y-auto p-1">
+            <li
+                v-for="meta in rundownState.index"
+                :key="meta.id"
+                class="flex items-center rounded gap-2 px-4 py-2 cursor-pointer transition-colors"
+                :class="{ 'bg-zinc-800 text-zinc-800': rundownState.current?.id === meta.id }"
+                @click="loadRundown(meta.id)"
+            >
+              <span class="flex-1 truncate text-sm text-zinc-300">{{ meta.name }}</span>
+            </li>
 
-    <!-- Rundown content -->
-    <section class="rounded-lg border border-border flex-1 overflow-y-auto">
+            <li v-if="rundownState.index.length === 0" class="px-4 py-3 text-xs text-zinc-600">
+              No rundowns yet
+            </li>
+          </ul>
+        </aside>
 
-      <div v-if="rundownState.loading && rundownState.current === null" class="flex items-center justify-center h-32 text-sm">
-        Loading…
-      </div>
+        <!-- Rundown content -->
+        <section class="rounded-lg border border-border flex-1 overflow-y-auto">
+          <div v-if="rundownState.loading && rundownState.current === null" class="flex items-center justify-center h-32 text-sm">
+            Loading…
+          </div>
 
-      <div v-else-if="rundownState.error" class="px-6 py-4 text-red-400 text-sm">
-        {{ rundownState.error }}
-      </div>
+          <div v-else-if="rundownState.error" class="px-6 py-4 text-red-400 text-sm">
+            {{ rundownState.error }}
+          </div>
 
-      <RundownComponent
-          v-else-if="rundownState.current"
-          :rundown="rundownState.current"
-          :active-page-id="player.page.value?.id ?? null"
-          @save="saveRundown"
-          @rename="onRename"
-          @edit-placeholders="placeholderModal?.open()"
-          @add-page="onAddPage"
-          @remove-page="onRemovePage"
-          @reorder="onReorder"
-          @rename-page="onRenamePage"
-          @recolor-page="onRecolorPage"
-          @add-row="onAddRow"
-          @remove-row="onRemoveRow"
-          @update-row="onUpdateRow"
-          @reorder-rows="onReorderRows"
-          @select-row="onSelectRow"
-          @take-row="onTakeRow"
-          @capture-row="onCaptureRow"
-          @play-page="onPlayPage"
-      />
+          <RundownComponent
+              v-else-if="rundownState.current"
+              :rundown="rundownState.current"
+              :active-page-id="player.page.value?.id ?? null"
+              @save="saveRundown"
+              @rename="onRename"
+              @edit-placeholders="placeholderModal?.open()"
+              @add-page="onAddPage"
+              @remove-page="onRemovePage"
+              @reorder="onReorder"
+              @rename-page="onRenamePage"
+              @recolor-page="onRecolorPage"
+              @add-row="onAddRow"
+              @remove-row="onRemoveRow"
+              @update-row="onUpdateRow"
+              @reorder-rows="onReorderRows"
+              @select-row="onSelectRow"
+              @take-row="onTakeRow"
+              @capture-row="onCaptureRow"
+              @play-page="onPlayPage"
+          />
 
-      <div v-else class="flex items-center justify-center h-32 text-zinc-600 text-sm">
-        Select a rundown to get started
-      </div>
-    </section>
+          <div v-else class="flex items-center justify-center h-32 text-zinc-600 text-sm">
+            Select a rundown to get started
+          </div>
+        </section>
 
-    <RundownRowEditor
-        v-if="editingRow"
-        :row="editingRow"
-        :scenes="scenes"
-        @save="onSaveEditedRow"
-        @cancel="rundownState.editing = null"
-    />
-  </main>
+        <!-- Row editor -->
+        <div v-if="editingRow" class="sticky top-2 self-start shrink-0">
+          <RundownRowEditor
+              :row="editingRow"
+              :scenes="scenes"
+              @save="onSaveEditedRow"
+              @cancel="rundownState.editing = null"
+              @take="onTakeEditedRow"
+              @out-all="outAll"
+          />
+        </div>
+      </main>
+    </div>
   </div>
+
   <PlaceholderModal
       ref="placeholderModal"
       :placeholders="rundownState.current?.placeholders ?? []"

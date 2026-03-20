@@ -285,8 +285,10 @@ export function usePagePlayer(api: PlayerSceneApi) {
         if (isInputFocused()) return
 
         if (e.code === "PageDown") {
+            e.preventDefault()
             outAll()
         } else if (e.code === "PageUp") {
+            e.preventDefault()
             takeAll()
         } else if (e.code === 'Space') {
             e.preventDefault()
@@ -328,5 +330,6 @@ export function usePagePlayer(api: PlayerSceneApi) {
         jumpToRow,
         skipNext,
         skipPrev,
+        scenes: api.scenes
     }
 }

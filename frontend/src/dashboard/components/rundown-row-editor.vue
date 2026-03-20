@@ -13,6 +13,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   save:   [row: Row]
   cancel: []
+  take:   [row: Row]
+  outAll: []
 }>()
 
 function cloneRow(row: Row): Row {
@@ -67,7 +69,7 @@ function save() {
 </script>
 
 <template>
-  <aside class="flex flex-col w-72 shrink-0 rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden h-full">
+  <aside class="flex flex-col w-full shrink-0 rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden h-full">
 
     <!-- Header -->
     <header class="flex items-center gap-2 px-3 py-2.5 border-b border-zinc-800 bg-zinc-900 shrink-0">
@@ -150,6 +152,18 @@ function save() {
           class="bg-zinc-700 hover:bg-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-300 transition-colors"
           @click="emit('cancel')"
       >Cancel</button>
+    </footer>
+
+    <footer class="grid grid-cols-2 gap-2 px-3 py-2.5 border-t border-zinc-800 shrink-0 bg-zinc-900">
+      <button
+          class="bg-blue-600 hover:bg-blue-500 rounded px-3 py-1.5 text-sm text-zinc-300 transition-colors"
+          @click="emit('take', draft)"
+      >Take</button>
+
+      <button
+          class="bg-zinc-700 hover:bg-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-300 transition-colors"
+          @click="emit('outAll')"
+      >Out</button>
     </footer>
   </aside>
 </template>
